@@ -1,38 +1,45 @@
 import os
 from dotenv import load_dotenv
 from google import genai
-import sys
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+
+
 load_dotenv()
 
+app = FastAPI()
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
+class ChatMessage(BaseModel):
+    message: str
 
-def ask_gemini():
+@app.get("/")
+def read_root():
+    return {"status": "Agent is running"}
 
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        print("Error: GEMINI_API_KEY not found in environment variables.")
-        sys.exit(1)
-    client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+@app.post("/chat")
+async def chat_with_gemini(chat_message: ChatMessage):
+    if not chat_message.message:
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+    
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=chat_message.message
 
-    print("Asking Gemini...")
-    print("Type 'exit' to quit.")
-
-    while True:
-        user_input = input("You: ")
-        if user_input.lower() == "exit":
-            print("Goodbye!")
-            break
-
-        try:
-            response = client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=user_input
-            )
-            print("Gemini: ", response.text)
-        except Exception as e:
-            print("Error communicating with Gemini:", e)
-            
+        )
+        return {"response": response.text}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
     
 if __name__ == "__main__":
-    ask_gemini()
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
