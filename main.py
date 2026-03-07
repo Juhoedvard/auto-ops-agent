@@ -1,33 +1,38 @@
 import os
 from dotenv import load_dotenv
 from google import genai
-
+import sys
 load_dotenv()
 
 
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+
 
 def ask_gemini():
-    files = [f for f in os.listdir() if os.path.isfile(f)]
 
-    prompt = f"""
-    You are DevOpsGPT. My project includes these files {files}. I want to create a Dockerfile for this project. Can you help me with that?
-    Result should be only the content of the Dockerfile, without any explanations or comments.
-    """
-    try:
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt
-        )
-        
-        docker = response.text.strip()
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        print("Error: GEMINI_API_KEY not found in environment variables.")
+        sys.exit(1)
+    client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
-        with open("Dockerfile", "w", encoding="utf-8") as f:
-            f.write(docker)
-        print("Dockerfile has been created successfully.")
-        
-    except Exception as e:
-        print(f"An error occurred: {e}")
+    print("Asking Gemini...")
+    print("Type 'exit' to quit.")
 
+    while True:
+        user_input = input("You: ")
+        if user_input.lower() == "exit":
+            print("Goodbye!")
+            break
+
+        try:
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=user_input
+            )
+            print("Gemini: ", response.text)
+        except Exception as e:
+            print("Error communicating with Gemini:", e)
+            
+    
 if __name__ == "__main__":
     ask_gemini()
