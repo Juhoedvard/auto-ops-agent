@@ -76,7 +76,7 @@ async def analyze_repository(repo_url: str, job_id: str):
         """
         
         response = client.models.generate_content(
-            model="gemini-2.0-flash",
+            model="gemini-2.5-flash",
             contents=prompt
         )
         
@@ -107,7 +107,7 @@ async def start_analysis(request: RepoRequest, background_tasks: BackgroundTasks
         "error": None
     }
 
-    background_tasks.add_task(analyze_repository, request.url, job_id)
+    background_tasks.add_task(analyze_repository, request.url.strip(), job_id)
     return {"jobId": job_id}
 
 
@@ -130,7 +130,7 @@ async def chat_with_gemini(chat_message: ChatMessage):
     
     try:
         response = client.models.generate_content(
-            model="gemini-2.0-flash", 
+            model="gemini-2.5-flash", 
             contents=chat_message.message
         )
         return {"response": response.text}
