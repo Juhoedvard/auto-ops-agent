@@ -1,0 +1,29 @@
+services:
+  # Python-backend (FastAPI)
+  backend:
+    build: ./backend
+    container_name: auto-ops-backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/app
+    # Käytetään --reload-lippua, jotta koodimuutokset päivittyvät lennosta
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  # React-frontend (Vite + TS + SWC)
+  frontend:
+    build: ./frontend
+    container_name: auto-ops-frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules # Estää Dockerin node_modules-kansion ylikirjoituksen
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    depends_on:
+      - backend
+    # Vite tarvitsee --host-lipun Dockerissa, jotta se vastaa ulkoisiin pyyntöihin
+    command: npm run dev -- --host
