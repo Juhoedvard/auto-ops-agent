@@ -1,23 +1,14 @@
-import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Home from './pages/home';
 import Result from './pages/result';
 
 function App() {
-  // Pidetään analyysidata täällä, jotta se säilyy sivujen välillä
-  const [analysis, setAnalysis] = useState<string | null>(null);
-
   return (
+
     <BrowserRouter>
       <Routes>
-        <Route 
-          path="/" 
-          element={<Home setAnalysis={setAnalysis} />} 
-        />
-        <Route 
-          path="/result" 
-          element={<Result analysis={analysis} />} 
-        />
+        <Route path="/" element={<Home />} />
+        <Route path="/result/:jobId" element={<Result />} />
       </Routes>
     </BrowserRouter>
   );
