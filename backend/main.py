@@ -3,6 +3,7 @@ import uuid
 import asyncio
 import shutil
 import tempfile
+import json
 from pathlib import Path
 from google import genai
 from fastapi import FastAPI, HTTPException, BackgroundTasks 
@@ -70,22 +71,36 @@ async def analyze_repository(repo_url: str, job_id: str):
         analysis_jobs[job_id]["status"] = "generating"
         
         prompt = f"""
-        Analyze this GitHub repository: {repo_url}
-        Here are the project files:
+        Analyze this repository: {repo_url}
+        Context from files:
         {content_summary}
-        
-        Create a professional CI/CD recommendation report in Markdown format.
-        Suggest a GitHub Actions .yml file based on the file structure.
+
+        Return ONLY a JSON object with the following keys. Do not include any other text or markdown formatting outside the JSON.
+
+        {{
+        "overview": "Short 2-3 sentence summary of the project.",
+        "tech_stack": ["List", "of", "detected", "technologies"],
+        "analysis": "Detailed analysis of the current CI/CD state.",
+        "yaml_config": "The full GitHub Actions .yml code as a string.",
+        "implementation_steps": ["Step 1", "Step 2", "Step 3"],
+        "benefits": ["Benefit 1", "Benefit 2"]
+        }}
         """
-        
- 
+
+
         response = await client.aio.models.generate_content(
             model="gemini-2.5-flash", 
-            contents=prompt
-        )
-
-        analysis_jobs[job_id]["result"] = response.text
-        analysis_jobs[job_id]["status"] = "ready"
+            contents=prompt,
+            config={
+                "response_mime_type": "application/json"
+            }
+)       
+        try:
+            json_data = json.loads(response.text)
+            analysis_jobs[job_id]["result"] = json_data
+            analysis_jobs[job_id]["status"] = "ready"
+        except json.JSONDecodeError:
+            raise Exception("Failed to parse JSON from model response")
         
     except Exception as e:
         print(f"Error in job {job_id}: {e}")

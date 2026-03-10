@@ -1,16 +1,11 @@
 
 import axios from 'axios';
+import type { JobStatus } from '../types/analysis';
 
 const api = axios.create({
   baseURL: 'http://localhost:8000',
 });
 
-export interface JobStatus {
-  id: string;
-  status: 'cloning' | 'analyzing' | 'generating' | 'ready' | 'failed';
-  result?: string;
-  error?: string;
-}
 
 export const analysisApi = {
 
@@ -21,7 +16,14 @@ export const analysisApi = {
 
 
   checkStatus: async (jobId: string): Promise<JobStatus> => {
-    const response = await api.get<JobStatus>(`/status/${jobId}`);
-    return response.data;
-  }
+      try {
+        const response = await api.get<JobStatus>(`/status/${jobId}`);
+        // Logitetaan TÄÄLLÄ, koska tämä on lähempänä lähdettä
+        console.log("📡 API Response Layer:", response.data);
+        return response.data;
+      } catch (error) {
+        console.error("❌ API Call crashed in analysisApi.ts:", error);
+        throw error;
+      }
+    }
 };

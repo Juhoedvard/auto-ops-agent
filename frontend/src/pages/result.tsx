@@ -1,23 +1,28 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import Markdown from 'react-markdown';
-import { analysisApi, type JobStatus } from '../api/analysisApi'; 
+
+import { analysisApi } from '../api/analysisApi'; 
 import AnalysisStepper from '../components/AnalysisStepper';
+import type { AnalysisResult, JobStatus } from '../types/analysis';
+import Overview from '../components/AnalysisOverview';
+import TechStack from '../components/TechStack';
+import AccordionGroup from '../components/AccordionGroup'; // Tuodaan uusi komponentti
+import YamlConfig from '../components/YamlConfig';
+import Benefits from '../components/Benefits';
+import ImplementationSteps from '../components/ImplementationSteps';
+import DetailedAnalysis from '../components/DetailedAnalysis';
 
 export default function Result() {
   const { jobId } = useParams<{ jobId: string }>();
   const navigate = useNavigate();
 
-
   const [status, setStatus] = useState<JobStatus['status']>('cloning');
-  const [analysis, setAnalysis] = useState<string | null>(null);
+  const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [messages, setMessages] = useState<{ role: string, content: string }[]>([]);
   const [input, setInput] = useState('');
   
 
-
-  // 1. POLLAUS-LOGIIKKA
   useEffect(() => {
     if (!jobId) {
       navigate('/'); 
@@ -30,17 +35,18 @@ export default function Result() {
         const data = await analysisApi.checkStatus(jobId);
         setStatus(data.status);
 
-        if (data.status === 'ready') {
-          setAnalysis(data.result || '');
+        if (data.status === 'ready' && data.result) {
+          setAnalysis(data.result);
+          console.log(data)
           active = false;
         } else if (data.status === 'failed') {
           setError(data.error || 'Analysis failed');
-          active  = false;
+          active = false;
         } else {
           setTimeout(poll, 2000); 
         }
       } catch (err) {
-        setError("Yhteys palvelimeen katkesi.");
+        setError("Connection to server failed.");
         active = false;
       }
     };
@@ -53,7 +59,6 @@ export default function Result() {
     if (!input.trim()) return;
     setMessages([...messages, { role: 'user', content: input }]);
     setInput('');
-    ///Tee myöhemmin
   };
 
   return (
@@ -100,8 +105,17 @@ export default function Result() {
             )}
 
             {status === 'ready' && analysis && (
-              <div className="prose prose-invert lg:prose-xl max-w-none">
-                <Markdown>{analysis}</Markdown>
+              <div className="max-w-4xl mx-auto space-y-6">
+                <h2 className="text-2xl font-bold mb-4">CI/CD Recommendation</h2>
+                
+
+                <Overview text={analysis.overview} />
+                <TechStack techs={analysis.tech_stack} />
+                <DetailedAnalysis content={analysis.analysis} />
+                <AccordionGroup data={analysis} />
+                <YamlConfig code={analysis.yaml_config} />
+                <Benefits benefits={analysis.benefits} />
+                <ImplementationSteps steps={analysis.implementation_steps} />
               </div>
             )}
           </div>
