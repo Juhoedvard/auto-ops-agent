@@ -15,7 +15,7 @@ export default function Result() {
   const [messages, setMessages] = useState<{ role: string, content: string }[]>([]);
   const [input, setInput] = useState('');
   
-  const isPolling = useRef(true);
+
 
   // 1. POLLAUS-LOGIIKKA
   useEffect(() => {
@@ -23,30 +23,30 @@ export default function Result() {
       navigate('/'); 
       return;
     }
-
+    let active = true;
     const poll = async () => {
-      if (!isPolling.current) return;
+      if (!active) return;
       try {
         const data = await analysisApi.checkStatus(jobId);
         setStatus(data.status);
 
         if (data.status === 'ready') {
           setAnalysis(data.result || '');
-          isPolling.current = false;
+          active = false;
         } else if (data.status === 'failed') {
           setError(data.error || 'Analysis failed');
-          isPolling.current = false;
+          active  = false;
         } else {
           setTimeout(poll, 2000); 
         }
       } catch (err) {
         setError("Yhteys palvelimeen katkesi.");
-        isPolling.current = false;
+        active = false;
       }
     };
 
     poll();
-    return () => { isPolling.current = false; };
+    return () => { active = false; };
   }, [jobId, navigate]);
 
   const handleSendMessage = () => {

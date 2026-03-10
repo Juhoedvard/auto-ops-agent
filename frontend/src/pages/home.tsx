@@ -15,7 +15,7 @@ export default function Home() {
     try {
 
       const jobId = await analysisApi.startAnalysis(url);
-      
+      console.log(jobId)
       navigate(`/result/${jobId}`); 
       
     } catch (err) {
