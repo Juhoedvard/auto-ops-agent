@@ -18,7 +18,7 @@ export default function Benefits({ benefits }: { benefits: string[] }) {
       <div className="p-4 border-t border-gray-100">
         <ul className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {benefits.map((benefit, i) => (
-            <li key={i} className="flex items-center gap-2 text-gray-700">
+            <li key={i} className="flex items-center gap-2 ">
               <span className="text-green-500">✔</span> {benefit}
             </li>
           ))}

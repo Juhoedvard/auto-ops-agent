@@ -86,7 +86,7 @@ export default function Result() {
       <main className="flex flex-col lg:flex-row gap-6 h-full flex-1">
         
         <section className="flex-1 min-w-0">
-          <div className="bg-[#161b22] border border-gray-800 rounded-xl p-6 shadow-sm min-h-[400px] lg:h-[85vh] overflow-y-auto">
+          <div className="bg-[#161b22] border border-gray-800 rounded-xl p-6 shadow-sm min-h-100 lg:h-[85vh] overflow-y-auto">
             
             {status !== 'ready' && !error && (
               <div className="h-full flex flex-col items-center justify-center space-y-8">
@@ -122,7 +122,7 @@ export default function Result() {
         </section>
 
         <aside className="w-full lg:w-96 shrink-0">
-          <div className="bg-[#161b22] border border-gray-800 rounded-xl flex flex-col h-[500px] lg:h-[85vh] sticky top-8 shadow-2xl">
+          <div className="bg-[#161b22] border border-gray-800 rounded-xl flex flex-col h-125 lg:h-[85vh] sticky top-8 shadow-2xl">
             <div className="p-4 border-b border-gray-800 flex justify-between items-center bg-[#1c2128] rounded-t-xl">
               <h2 className="font-semibold text-xs uppercase tracking-widest text-gray-400">AI Assistant</h2>
               <span className="flex items-center gap-2 text-[10px] text-green-500 font-mono">

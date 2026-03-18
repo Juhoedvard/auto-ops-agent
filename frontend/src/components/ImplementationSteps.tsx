@@ -16,7 +16,7 @@ export default function ImplementationSteps({ steps }: { steps: string[] }) {
       <div className="p-4 border-t border-gray-100">
         <ol className="space-y-3">
           {steps.map((step, i) => (
-            <li key={i} className="flex gap-3 text-gray-700">
+            <li key={i} className="flex gap-3 ">
               <span className="font-bold text-blue-500">{i + 1}.</span>
               {step}
             </li>
