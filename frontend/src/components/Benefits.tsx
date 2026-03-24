@@ -5,9 +5,6 @@
 
 export default function Benefits({ benefits }: { benefits: string[] }) {
 
-  console.log(benefits)
-
-
 
   return (
     <details className="group border border-gray-200 rounded-lg mb-4 shadow-sm">

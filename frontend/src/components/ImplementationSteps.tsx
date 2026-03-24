@@ -10,7 +10,7 @@ export default function ImplementationSteps({ steps }: { steps: string[] }) {
   return (
     <details className="group border border-gray-200 rounded-lg mb-4 shadow-sm">
       <summary className="accordion-summary">
-        <span>Step-by-Step Implementation</span>
+        <span className="border-b">Step-by-Step Implementation</span>
         <span className="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
       </summary>
       <div className="p-4 border-t border-gray-100">
