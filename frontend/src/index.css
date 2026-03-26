@@ -2,74 +2,95 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
-:root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+@layer base {
+body {
+@apply bg-[#0d1117] text-white antialiased selection:bg-blue-500/30;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
+/* Custom scrollbar */
+::-webkit-scrollbar {
+width: 10px;
 }
-a:hover {
-  color: #535bf2;
+::-webkit-scrollbar-track {
+@apply bg-transparent;
 }
-
-
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+::-webkit-scrollbar-thumb {
+@apply bg-gray-800 rounded-full border-2 border-[#0d1117] hover:bg-gray-700;
+}
 }
 
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: rgb(48, 48, 156);
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+@layer components {
+/* --- HAITARIT (ACCORDIONS) --- */
+
+/* Pääsäiliö details-elementille */
+.accordion-container {
+@apply border border-gray-800 rounded-xl mb-4 shadow-lg bg-[#161b22] overflow-hidden transition-all duration-300;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
-  button:hover {
-    border-color: #646cff;
-  }
+/* Summary-otsikko */
+.accordion-summary {
+@apply flex justify-between items-center p-5 cursor-pointer hover:bg-gray-800/50
+font-bold text-gray-200 transition-colors list-none outline-none;
 }
 
+/* Poistetaan selaimen oletusnuoli */
+.accordion-summary::-webkit-details-marker {
+display: none;
+}
 
-@keyframes pulse {
-  50% {
-    opacity: 0.3;
-  }
+/* Sisältöalue details-elementin sisällä /
+/ Korvattu fade-in ja muut standardilla opacitylla ja transitionilla */
+.accordion-content {
+@apply p-6 border-t border-gray-800 bg-[#0d1117] relative transition-opacity duration-300 ease-in-out;
+}
+
+/* --- PAINIKKEET --- */
+
+.btn-primary {
+@apply bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg
+font-semibold transition-all shadow-md active:scale-95 disabled:opacity-50;
+}
+
+.btn-copy {
+@apply bg-gray-800 hover:bg-gray-700 text-gray-300 text-[10px] px-3 py-1.5
+rounded-md border border-gray-700 transition-all uppercase font-bold
+tracking-wider hover:text-white hover:border-gray-500;
+}
+
+/* --- TEKSTIMUOTOILUT (TYPOGRAPHY) --- */
+
+/* Markdown-sisällön muotoilu */
+.prose-custom {
+@apply prose prose-invert prose-sm max-w-none
+prose-headings:text-blue-400 prose-headings:font-bold
+prose-p:text-gray-400 prose-p:leading-relaxed
+prose-li:text-gray-400
+prose-strong:text-white
+prose-code:text-blue-300 prose-code:bg-blue-900/20 prose-code:px-1 prose-code:rounded;
+}
+
+/* Koodiblokkien säiliö */
+.code-container {
+@apply rounded-xl overflow-hidden border border-gray-800 bg-[#010409] my-2;
+}
+
+/* --- APULUOKAT --- */
+
+.glass-panel {
+@apply bg-[#161b22]/80 backdrop-blur-md border border-gray-800 shadow-2xl;
+}
+
+.status-dot {
+@apply w-2 h-2 rounded-full inline-block mr-2;
+}
+}
+
+/* Animaatiot nuolelle kun details on auki */
+details[open] .accordion-arrow {
+@apply rotate-180 text-blue-500;
+}
+
+/* Estetään tekstin valinta summaryssa */
+summary {
+user-select: none;
 }
