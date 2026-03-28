@@ -1,4 +1,5 @@
 
+import type { MouseEvent } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
@@ -7,26 +8,25 @@ interface YamlConfigProps {
 }
 
 export default function YamlConfig({ code }: YamlConfigProps) {
-  // Debug-logiikka
-  console.log("📄 YamlConfig rendering with code length:", code?.length);
+
+
 
   const copyToClipboard = () => {
     if (!code) return;
     
-    // Varmistettu kopiointimetodi
     const textArea = document.createElement("textarea");
     textArea.value = code;
     document.body.appendChild(textArea);
     textArea.select();
     try {
       document.execCommand('copy');
-      // Voit korvata tämän hienommalla "Toast" -ilmoituksella myöhemmin
-      console.log("Kopioitu leikepöydälle!");
+
     } catch (err) {
       console.error("Kopiointi epäonnistui", err);
     }
     document.body.removeChild(textArea);
   };
+
 
   return (
     <details className="group border border-gray-800 rounded-lg mb-4 shadow-sm bg-[#1c2128] overflow-hidden">
@@ -41,7 +41,6 @@ export default function YamlConfig({ code }: YamlConfigProps) {
       </summary>
       
       <div className="p-4 border-t border-gray-800 bg-[#0d1117] relative">
-        {code ? (
           <>
             <div className="flex justify-end mb-2">
               <button 
@@ -70,11 +69,6 @@ export default function YamlConfig({ code }: YamlConfigProps) {
               </SyntaxHighlighter>
             </div>
           </>
-        ) : (
-          <div className="py-10 text-center text-gray-500 italic text-sm">
-            Ei YAML-konfiguraatiota generoituna.
-          </div>
-        )}
       </div>
     </details>
   );

@@ -144,7 +144,7 @@ export default function ChatBox({ contextYaml, status }: ChatBoxProps) {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={status === 'ready' ? "Kirjoita viesti..." : "Wait for analysis..."}
+            placeholder={status === 'ready' ? "Write a message..." : "Wait for analysis..."}
             disabled={status !== 'ready' || isLoading}
             className="flex-1 bg-[#0d1117] border border-gray-700 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-blue-500 transition-all disabled:opacity-50 placeholder-gray-600"
           />
