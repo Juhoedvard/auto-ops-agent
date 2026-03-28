@@ -1,6 +1,8 @@
 
 import axios from 'axios';
-import type { JobStatus } from '../types/analysis';
+import type { AnalysisResult, JobStatus } from '../types/analysis';
+
+type AnalysisContext =  Pick<AnalysisResult, 'overview' | 'analysis'>;
 
 const api = axios.create({
   baseURL: 'http://localhost:8000',
@@ -25,5 +27,15 @@ export const analysisApi = {
         console.error("❌ API Call crashed in analysisApi.ts:", error);
         throw error;
       }
+    },
+   handleRegenerateYaml: async (ContextData: AnalysisContext) => {
+      if (!ContextData) return;
+      try {
+        const response = await api.post('refetchYaml', ContextData);
+        return response.data;
+      } catch (err) {
+        console.error("Regeneration failed", err);
+        throw err;
     }
+  }
 };

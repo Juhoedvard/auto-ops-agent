@@ -6,7 +6,7 @@ import AnalysisStepper from '../components/AnalysisStepper';
 import type { AnalysisResult, JobStatus } from '../types/analysis';
 import Overview from '../components/AnalysisOverview';
 import TechStack from '../components/TechStack';
-import AccordionGroup from '../components/AccordionGroup'; // Tuodaan uusi komponentti
+import AccordionGroup from '../components/AccordionGroup'; 
 import YamlConfig from '../components/YamlConfig';
 import Benefits from '../components/Benefits';
 import ImplementationSteps from '../components/ImplementationSteps';
@@ -20,6 +20,7 @@ export default function Result() {
   const [status, setStatus] = useState<JobStatus['status']>('cloning');
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isRefetching, setIsRefetching] = useState(false);
 
 
   useEffect(() => {
@@ -54,7 +55,29 @@ export default function Result() {
     return () => { active = false; };
   }, [jobId, navigate]);
 
+  const refetchYaml = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!analysis || isRefetching) return;
 
+    setIsRefetching(true);
+    try {
+      const result = await analysisApi.handleRegenerateYaml({
+        analysis: analysis.analysis,
+        overview: analysis.overview
+      });
+
+
+      setAnalysis({
+        ...analysis,
+        yaml_config: result.yaml 
+      });
+    } catch (err) {
+      console.error("Failed to refetch YAML:", err);
+      setError("Failed to regenerate YAML. Please try again.");
+    } finally {
+      setIsRefetching(false);
+    }
+  }
 
   return (
     <div className="flex flex-col min-h-screen w-full p-4 lg:p-8 bg-[#0d1117] text-white">
@@ -108,7 +131,22 @@ export default function Result() {
                 <TechStack techs={analysis.tech_stack} />
                 <DetailedAnalysis content={analysis.analysis} />
                 <AccordionGroup data={analysis} />
-                <YamlConfig code={analysis.yaml_config} />
+                {analysis.yaml_config ? <YamlConfig code={analysis.yaml_config} /> : (
+                    <div className="py-12 text-center flex flex-col items-center gap-4">
+                        <div className="text-gray-400 text-sm">
+                          <span className="text-yellow-500/80 block mb-1 font-semibold">No YAML configuration found.</span>
+                          <p className="italic opacity-70">The analysis might have skipped this part or failed.</p>
+                        </div>
+                        
+                        <button 
+                          onClick={(e) => {refetchYaml(e)}}
+                          disabled={isRefetching}
+                          className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold rounded-lg transition-all shadow-lg active:scale-95 border border-blue-400/20 flex items-center gap-2 disabled:opacity-50"
+                        >
+                          <span>↻</span> {isRefetching ? 'Regenerating...' : 'Refetch YAML'}
+                        </button>
+                    </div>
+                )}
                 <Benefits benefits={analysis.benefits} />
                 <ImplementationSteps steps={analysis.implementation_steps} />
               </div>

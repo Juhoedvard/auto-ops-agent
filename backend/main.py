@@ -44,6 +44,10 @@ class ChatRequest(BaseModel):
 class RepoRequest(BaseModel):
     url: str
 
+class YamlRequest(BaseModel):
+    overview: str
+    analysis: str
+
 def sanitize_analysis_result(raw_data: Any) -> dict:
     """
     Ensures that the AI response matches the expected structure and types.
@@ -135,6 +139,10 @@ async def analyze_repository(repo_url: str, job_id: str):
        
         raw_json = json.loads(response.text)
 
+        # --- TESTING ONLY: Force empty YAML to show the Refetch button ---
+        #if "yaml_config" in raw_json:
+        #    raw_json["yaml_config"] = ""
+
         analysis_jobs[job_id]["result"] = sanitize_analysis_result(raw_json)
         analysis_jobs[job_id]["status"] = "ready"
         
@@ -151,6 +159,12 @@ async def analyze_repository(repo_url: str, job_id: str):
 def read_root():
     return {"status": "Auto-Ops Agent API is active"}
 
+@app.get("/status/{job_id}")
+async def get_status(job_id: str):
+    if job_id not in analysis_jobs:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return analysis_jobs[job_id]
+
 @app.post("/analyze")
 async def start_analysis(request: RepoRequest, background_tasks: BackgroundTasks):
     job_id = str(uuid.uuid4())
@@ -158,11 +172,29 @@ async def start_analysis(request: RepoRequest, background_tasks: BackgroundTasks
     background_tasks.add_task(analyze_repository, request.url.strip(), job_id)
     return {"jobId": job_id}
 
-@app.get("/status/{job_id}")
-async def get_status(job_id: str):
-    if job_id not in analysis_jobs:
-        raise HTTPException(status_code=404, detail="Job not found")
-    return analysis_jobs[job_id]
+@app.post("/refetchYaml")
+async def refetch_yaml(request: YamlRequest):
+    try:
+        prompt = f"""
+        Based on the following project overview and technical analysis, 
+        generate a complete and valid CI/CD YAML configuration file (e.g., GitHub Actions).
+
+        Project Overview:
+        {request.overview}
+
+        Technical Analysis:
+        {request.analysis}
+
+        Return a JSON object with a single field 'yaml' containing the string content of the configuration.
+        """
+        response = client.models.generate_content(
+            model=MODEL_ID,
+            contents=prompt,
+            config={"response_mime_type": "application/json"}
+        )
+        return json.loads(response.text)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/chat")
 async def chat_with_gemini(request: ChatRequest):
@@ -174,7 +206,6 @@ async def chat_with_gemini(request: ChatRequest):
                     "role": "user" if msg.role == "user" else "model",
                     "parts": [{"text": msg.parts[0].text}]
                 })
-
         system_instruction = (
             "You are Auto-Ops AI, a friendly and professional Senior DevOps Assistant. "
             "You have access to the current project YAML configuration for context.\n\n"
