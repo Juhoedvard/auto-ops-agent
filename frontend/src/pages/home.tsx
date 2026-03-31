@@ -13,7 +13,7 @@ export default function Home() {
 
   const handleStart = async (e: React.FormEvent) => {
     e.preventDefault();
-
+    console.log("Starting analysis for URL:", url);
     if (!url.trim()) {
       toast.error('Please enter a GitHub repository URL');
       return;
@@ -35,14 +35,14 @@ export default function Home() {
 
   return (
     <div className="landing-page bg-linear-to-br from-slate-900 via-blue-900/20 to-indigo-900 min-h-screen text-white flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8 relative overflow-hidden">
-      <div className="absolute inset-0 bg-linear-to-r from-cyan-500/5 via-transparent to-purple-500/5 animate-pulse"></div>
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse delay-2000"></div>
+      <div className="absolute inset-0 bg-linear-to-r from-cyan-500/5 via-transparent to-purple-500/5 animate-pulse pointer-events-none"></div>
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl animate-pulse delay-1000 pointer-events-none"></div>
+      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse delay-2000 pointer-events-none"></div>
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
-        className="max-w-sm sm:max-w-md lg:max-w-lg xl:max-w-xl w-full space-y-6 sm:space-y-8"
+        className="relative z-10 max-w-sm sm:max-w-md lg:max-w-lg xl:max-w-xl w-full space-y-6 sm:space-y-8"
       >
         <div className="text-center">
           <motion.h1
@@ -65,6 +65,7 @@ export default function Home() {
 
         <motion.form
           onSubmit={handleStart}
+          noValidate
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.6, duration: 0.5 }}
@@ -72,7 +73,7 @@ export default function Home() {
         >
           <div className="relative">
             <input
-              type="url"
+              type="text"
               placeholder="https://github.com/user/repo"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
