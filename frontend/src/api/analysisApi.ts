@@ -2,7 +2,7 @@
 import axios from 'axios';
 import type { AnalysisResult, JobStatus } from '../types/analysis';
 
-type AnalysisContext =  Pick<AnalysisResult, 'overview' | 'analysis'>;
+type AnalysisContext =  Pick<AnalysisResult, 'overview' | 'analysis'> & { jobId: string };
 
 const api = axios.create({
   baseURL: 'http://localhost:8000',
