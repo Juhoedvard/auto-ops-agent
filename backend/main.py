@@ -91,16 +91,21 @@ async def analyze_repository(repo_url: str, job_id: str):
     try: 
         analysis_jobs[job_id]["status"] = "cloning"
         
-        process = await asyncio.create_subprocess_exec(
-            "git", "clone", "--depth", "1", repo_url.strip(), temp_dir,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
-        await process.communicate()
+       
+        try:
+            process = await asyncio.create_subprocess_exec(
+                "git", "clone", "--depth", "1", repo_url.strip(), temp_dir,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=60.0)
+            
+            if process.returncode != 0:
+                stderr_text = stderr.decode('utf-8', errors='ignore') if stderr else ""
+                raise Exception(f"Git clone failed: {stderr_text}")
+        except asyncio.TimeoutError:
+            raise Exception("Repository clone timed out. The repository may be too large or the connection is slow.")
         
-        if process.returncode != 0:
-            raise Exception("Git clone failed. Check repository visibility and URL.")
-
         analysis_jobs[job_id]["status"] = "analyzing"
         
 
@@ -116,26 +121,45 @@ async def analyze_repository(repo_url: str, job_id: str):
 
         analysis_jobs[job_id]["status"] = "generating"
         
-        prompt = f"""
-        Analyze this GitHub repository: {repo_url}
-        Context: {content_summary}
-
-        Return a JSON object with:
-        - overview (string)
-        - tech_stack (list of strings)
-        - analysis (detailed markdown string)
-        - yaml_config (complete .yml string)
-        - implementation_steps (list of strings)
-        - benefits (list of strings)
-        
-        Language: English.
-        """
-
-        response = client.models.generate_content(
-            model=MODEL_ID,
-            contents=prompt,
-            config={"response_mime_type": "application/json"}
+        prompt = (
+            f"Act as a Senior DevOps Engineer. Your task is to analyze the provided repository: {repo_url}\n"
+            f"Use the following file context to determine the build, test, and deployment requirements:\n"
+            f"{content_summary}\n\n"
+            "Generate a production-grade CI/CD strategy. Return a JSON object with these exact fields:\n"
+            "1. 'overview': A concise summary (2-3 sentences) of what the project does.\n"
+            "2. 'tech_stack': A list of all identified programming languages, frameworks, and infrastructure tools.\n"
+            "3. 'analysis': A detailed technical breakdown in Markdown. Explain the CI/CD requirements, dependency management, and recommended environment variables.\n"
+            "4. 'yaml_config': A complete, syntax-valid GitHub Actions .yml file. It MUST include: \n"
+            "   - Triggers for push/PR to main/master.\n"
+            "   - Job for linting/security scanning.\n"
+            "   - Job for running unit tests.\n"
+            "   - A placeholder job for deployment (e.g., to Docker Hub, AWS, or Vercel).\n"
+            "5. 'implementation_steps': A step-by-step list of what the user needs to do (e.g., 'Add secret X to GitHub Settings').\n"
+            "6. 'benefits': A list of how this specific pipeline improves the development lifecycle.\n\n"
+            "Language: English. Ensure the JSON is valid and the YAML is properly escaped."
         )
+        
+      
+        try:
+            response = await asyncio.wait_for(
+                asyncio.get_event_loop().run_in_executor(
+                    None, 
+                    lambda: client.models.generate_content(
+                        model=MODEL_ID,
+                        contents=prompt,
+                        config={"response_mime_type": "application/json"}
+                    )
+                ),
+                timeout=120.0
+            )
+        except asyncio.TimeoutError:
+            raise Exception("AI analysis timed out. The repository may be too complex to analyze.")
+        
+        raw_json = json.loads(response.text)
+
+        # --- TESTING ONLY: Force empty YAML to show the Refetch button ---
+        #if "yaml_config" in raw_json:
+        #    raw_json["yaml_config"] = ""
        
         raw_json = json.loads(response.text)
 

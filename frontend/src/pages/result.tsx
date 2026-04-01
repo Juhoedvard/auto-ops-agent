@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import toast from 'react-hot-toast';
 
 import { analysisApi } from '../api/analysisApi'; 
 import AnalysisStepper from '../components/AnalysisStepper';
@@ -12,6 +14,7 @@ import Benefits from '../components/Benefits';
 import ImplementationSteps from '../components/ImplementationSteps';
 import DetailedAnalysis from '../components/DetailedAnalysis';
 import ChatBox from '../components/ChatBox';
+import LoadingButton from '../components/LoadingButton';
 
 export default function Result() {
   const { jobId } = useParams<{ jobId: string }>();
@@ -21,6 +24,7 @@ export default function Result() {
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isRefetching, setIsRefetching] = useState(false);
+  const [activeSection, setActiveSection] = useState<'main' | 'chat'>('main');
 
 
   useEffect(() => {
@@ -28,11 +32,25 @@ export default function Result() {
       navigate('/'); 
       return;
     }
+    
+    const MAX_POLL_ATTEMPTS = 120; 
+    const POLL_INTERVAL = 2000;
     let active = true;
+    let pollCount = 0;
+    let consecutiveErrors = 0;
+    
     const poll = async () => {
-      if (!active) return;
+      if (!active || pollCount >= MAX_POLL_ATTEMPTS) {
+        if (pollCount >= MAX_POLL_ATTEMPTS) {
+          setError("Analysis is taking longer than expected. Please refresh the page or contact support if the issue persists.");
+        }
+        return;
+      }
+      
       try {
         const data = await analysisApi.checkStatus(jobId);
+        pollCount++;
+        consecutiveErrors = 0; 
         setStatus(data.status);
 
         if (data.status === 'ready' && data.result) {
@@ -43,17 +61,34 @@ export default function Result() {
           setError(data.error || 'Analysis failed');
           active = false;
         } else {
-          setTimeout(poll, 2000); 
+          setTimeout(poll, POLL_INTERVAL); 
         }
       } catch (err) {
-        setError("Connection to server failed.");
-        active = false;
+        pollCount++;
+        consecutiveErrors++;
+        
+        
+        if (consecutiveErrors < 3) {
+          console.warn(`Polling attempt ${pollCount} failed, retrying... (${consecutiveErrors}/3)`);
+          setTimeout(poll, POLL_INTERVAL);
+        } else {
+          
+          setError("Unable to connect to server. Please check your internet connection and try again.");
+          active = false;
+        }
       }
     };
 
     poll();
     return () => { active = false; };
   }, [jobId, navigate]);
+
+  
+  useEffect(() => {
+    if (analysis && activeSection === 'main') {
+
+    }
+  }, [analysis, activeSection]);
 
   const refetchYaml = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -63,7 +98,8 @@ export default function Result() {
     try {
       const result = await analysisApi.handleRegenerateYaml({
         analysis: analysis.analysis,
-        overview: analysis.overview
+        overview: analysis.overview,
+        jobId: jobId as string
       });
 
 
@@ -71,93 +107,130 @@ export default function Result() {
         ...analysis,
         yaml_config: result.yaml 
       });
+      toast.success('YAML configuration regenerated successfully!', { duration: 3000 });
     } catch (err) {
       console.error("Failed to refetch YAML:", err);
-      setError("Failed to regenerate YAML. Please try again.");
+      toast.error('Failed to regenerate YAML. Please try again.', { duration: 4000 });
     } finally {
       setIsRefetching(false);
     }
   }
 
   return (
-    <div className="flex flex-col min-h-screen w-full p-4 lg:p-8 bg-[#0d1117] text-white">
-      <header className="w-full flex items-center justify-between mb-8 border-b border-gray-800 pb-4">
+    <div className="flex flex-col min-h-screen w-full p-4 lg:p-8 bg-linear-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
+      <header className="w-full flex items-center justify-between mb-8 border-b border-slate-700/50 pb-4">
         <div className="flex items-center gap-4">
           <button 
             onClick={() => navigate('/')}
-            className="hover:bg-gray-800 p-2 rounded-full transition-colors text-gray-400"
+            className="hover:bg-slate-700/50 p-2 rounded-full transition-colors text-slate-400 hover:text-cyan-400"
           >
             ←
           </button>
           <h1 className="text-xl lg:text-2xl font-bold tracking-tight">
-            Auto-CI/CD <span className="text-blue-500">Agent</span>
+            Auto-CI/CD <span className="text-cyan-400">Agent</span>
           </h1>
         </div>
         <div className="flex items-center gap-3 font-mono text-[10px]">
-          <span className="text-gray-500">ID: {jobId?.slice(0,8)}</span>
-          <span className={`${status === 'ready' ? 'text-green-500' : 'text-yellow-500'} uppercase animate-pulse`}>
+          <span className="text-slate-500">ID: {jobId?.slice(0,8)}</span>
+          <span className={`${status === 'ready' ? 'text-emerald-400' : 'text-amber-400'} uppercase animate-pulse`}>
             ● {status}
           </span>
         </div>
       </header>
 
-      <main className="flex flex-col lg:flex-row gap-6 h-full flex-1">
+      <main className="flex flex-col lg:flex-row gap-4 sm:gap-6 h-full flex-1 transition-all duration-300">
         
-        <section className="flex-1 min-w-0">
-          <div className="bg-[#161b22] border border-gray-800 rounded-xl p-6 shadow-sm min-h-100 lg:h-[85vh] overflow-y-auto">
-            
-            {status !== 'ready' && !error && (
-              <div className="h-full flex flex-col items-center justify-center space-y-8">
-                <h2 className="text-xl font-semibold text-gray-300">Processing Repository</h2>
-                <AnalysisStepper currentStatus={status} />
-              </div>
-            )}
+        <motion.section
+          layout
+          className={`min-w-0 transition-all duration-300 ${
+            activeSection === 'main' 
+              ? 'flex-3 lg:flex-4' 
+              : 'flex-1'
+          }`}
+          onClick={() => setActiveSection('main')}
+          onFocus={() => setActiveSection('main')}
+          onScroll={() => setActiveSection('main')}
+        >
+          <div 
+            className={`bg-slate-800/50 backdrop-blur-sm border rounded-xl shadow-sm min-h-100 lg:h-[85vh] transition-all duration-300  ${
+              activeSection === 'main' 
+                ? 'border-cyan-400/50 shadow-cyan-400/10' 
+                : 'border-slate-700/50'
+            } p-4 sm:p-6 md:p-8`}
+          >
+            <div className="overflow-y-auto h-full">
+              {/* All content inside this scrollable wrapper */}
+              {status !== 'ready' && !error && (
+                <div className="h-full flex flex-col items-center justify-center space-y-8">
+                  <h2 className="text-xl font-semibold text-slate-200">Processing Repository</h2>
+                  <AnalysisStepper currentStatus={status} />
+                </div>
+              )}
 
-            {error && (
-              <div className="h-full flex flex-col items-center justify-center text-center">
-                <div className="text-red-500 text-4xl mb-4">⚠️</div>
-                <h2 className="text-xl font-bold mb-2">Analysis Failed</h2>
-                <p className="text-gray-400">{error}</p>
-                <button onClick={() => navigate('/')} className="mt-6 text-blue-500 hover:underline">Try another repository</button>
-              </div>
-            )}
+              {error && (
+                <div className="h-full flex flex-col items-center justify-center text-center">
+                  <div className="text-red-400 text-4xl mb-4">⚠️</div>
+                  <h2 className="text-xl font-bold mb-2">Analysis Failed</h2>
+                  <p className="text-slate-400">{error}</p>
+                  <button onClick={() => navigate('/')} className="mt-6 text-cyan-400 hover:text-cyan-300 hover:underline">Try another repository</button>
+                </div>
+              )}
 
-            {status === 'ready' && analysis && (
-              <div className="max-w-4xl mx-auto space-y-6">
-                <h2 className="text-2xl font-bold mb-4">CI/CD Recommendation</h2>
-                
-
-                <Overview text={analysis.overview} />
-                <TechStack techs={analysis.tech_stack} />
-                <DetailedAnalysis content={analysis.analysis} />
-                <AccordionGroup data={analysis} />
-                {analysis.yaml_config ? <YamlConfig code={analysis.yaml_config} /> : (
-                    <div className="py-12 text-center flex flex-col items-center gap-4">
-                        <div className="text-gray-400 text-sm">
-                          <span className="text-yellow-500/80 block mb-1 font-semibold">No YAML configuration found.</span>
-                          <p className="italic opacity-70">The analysis might have skipped this part or failed.</p>
-                        </div>
-                        
-                        <button 
-                          onClick={(e) => {refetchYaml(e)}}
-                          disabled={isRefetching}
-                          className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold rounded-lg transition-all shadow-lg active:scale-95 border border-blue-400/20 flex items-center gap-2 disabled:opacity-50"
-                        >
-                          <span>↻</span> {isRefetching ? 'Regenerating...' : 'Refetch YAML'}
-                        </button>
-                    </div>
-                )}
-                <Benefits benefits={analysis.benefits} />
-                <ImplementationSteps steps={analysis.implementation_steps} />
-              </div>
-            )}
+              {status === 'ready' && analysis && (
+                <div className="max-w-4xl mx-auto mt-4 p-6 space-y-6">
+                  <h2 className="text-2xl font-bold mb-4 text-slate-100">CI/CD Recommendation</h2>
+                  <Overview text={analysis.overview} />
+                  <TechStack techs={analysis.tech_stack} />
+                  <DetailedAnalysis content={analysis.analysis} />
+                  <AccordionGroup data={analysis} />
+                  {analysis.yaml_config ? <YamlConfig code={analysis.yaml_config} /> : (
+                      <div className="py-12 text-center flex flex-col items-center gap-4">
+                          <div className="text-slate-400 text-sm">
+                            <span className="text-amber-400/80 block mb-1 font-semibold">No YAML configuration found.</span>
+                            <p className="italic opacity-70">The analysis might have skipped this part or failed.</p>
+                          </div>
+                          
+                          <LoadingButton
+                            onClick={(e) => {refetchYaml(e)}}
+                            loading={isRefetching}
+                            loadingText="Regenerating..."
+                            className="px-6 py-2 bg-linear-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-sm font-bold rounded-lg shadow-lg shadow-cyan-500/25 active:scale-95 border border-cyan-400/20"
+                          >
+                            <span>↻</span> Refetch YAML
+                          </LoadingButton>
+                      </div>
+                  )}
+                  <Benefits benefits={analysis.benefits} />
+                  <ImplementationSteps steps={analysis.implementation_steps} />
+                </div>
+              )}
+            </div>
           </div>
-        </section>
+        </motion.section>
        {analysis &&(
-        <aside className="w-full lg:w-96 shrink-0">
-          
-            <ChatBox contextYaml={analysis.yaml_config} status={status} />
-        </aside>
+        <motion.aside
+          layout
+          className={`shrink-0 transition-all duration-300 ${
+            activeSection === 'chat' 
+              ? 'w-full lg:w-150 xl:w-175' 
+              : 'w-full lg:w-64 xl:w-72'
+          }`}
+          onClick={() => setActiveSection('chat')}
+          onFocus={() => setActiveSection('chat')}
+        >
+
+            <ChatBox 
+              contextYaml={analysis.yaml_config}
+              status={status} 
+              onChatActivity={() => setActiveSection('chat')}
+              onMessagesChange={(hasMessages) => {
+                if (hasMessages && activeSection === 'main') {
+                  setActiveSection('chat');
+                }
+              }}
+              isActive={activeSection === 'chat'}
+            />
+        </motion.aside>
         )}
 
       </main>
