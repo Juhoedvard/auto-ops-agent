@@ -1,9 +1,10 @@
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import { analysisApi } from '../api/analysisApi';
+import LoadingButton from '../components/LoadingButton';
 
 export default function Home() {
   const [url, setUrl] = useState('');
@@ -11,25 +12,60 @@ export default function Home() {
   const navigate = useNavigate();
   console.log(url)
 
+  const isValidGithubUrl = (url: string): boolean => {
+    const githubUrlPattern = /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+$/i;
+    return githubUrlPattern.test(url.trim());
+  };
+
   const handleStart = async (e: React.FormEvent) => {
     e.preventDefault();
     console.log("Starting analysis for URL:", url);
+    
     if (!url.trim()) {
       toast.error('Please enter a GitHub repository URL');
       return;
     }
+    
+    if (!isValidGithubUrl(url)) {
+      toast.error('Please enter a valid GitHub repository URL (e.g., https://github.com/owner/repo)');
+      return;
+    }
+    
     setLoading(true);
+    let timeoutId: number | undefined;
 
     try {
       toast.loading('Starting analysis...', { id: 'analysis' });
+      
+      
+      timeoutId = setTimeout(() => {
+        setLoading(false);
+        toast.error('Analysis request timed out. Please try again.', { id: 'analysis' });
+      }, 30000);
+      
       const jobId = await analysisApi.startAnalysis(url);
+      clearTimeout(timeoutId);
       toast.success('Analysis started successfully!', { id: 'analysis' });
       navigate(`/result/${jobId}`);
     } catch (err) {
+      clearTimeout(timeoutId);
       console.error('Error starting analysis:', err);
-      toast.error('Error starting analysis. Please check the URL and try again.', { id: 'analysis' });
-    } finally {
       setLoading(false);
+      
+      
+      if (err instanceof Error) {
+        if (err.message.includes('timeout') || err.message.includes('network')) {
+          toast.error('Network error. Please check your connection and try again.', { id: 'analysis' });
+        } else if (err.message.includes('404') || err.message.includes('not found')) {
+          toast.error('Repository not found. Please check the URL and try again.', { id: 'analysis' });
+        } else if (err.message.includes('403') || err.message.includes('rate limit')) {
+          toast.error('Rate limit exceeded. Please wait a moment and try again.', { id: 'analysis' });
+        } else {
+          toast.error(`Analysis failed: ${err.message}`, { id: 'analysis' });
+        }
+      } else {
+        toast.error('Error starting analysis. Please check the URL and try again.', { id: 'analysis' });
+      }
     }
   };
 
@@ -86,25 +122,14 @@ export default function Home() {
               </svg>
             </div>
           </div>
-          <button
+          <LoadingButton
             type="submit"
-            disabled={loading}
-            className="w-full bg-linear-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 py-3 sm:py-4 rounded-xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-xl shadow-cyan-500/25 hover:shadow-cyan-400/40 flex items-center justify-center space-x-2 border border-cyan-400/20"
+            loading={loading}
+            loadingText="Starting..."
+            className="w-full bg-linear-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 py-3 sm:py-4 rounded-xl font-bold shadow-xl shadow-cyan-500/25 hover:shadow-cyan-400/40 border border-cyan-400/20"
           >
-            {loading ? (
-              <>
-                <svg className="animate-spin w-4 h-4 sm:w-5 sm:h-5" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                <span>Starting...</span>
-              </>
-            ) : (
-              <>
-              <span >Analyze Repository</span>
-              </>
-            )}
-          </button>
+            Analyze Repository
+          </LoadingButton>
         </motion.form>
       </motion.div>
     </div>

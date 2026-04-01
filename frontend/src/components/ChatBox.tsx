@@ -5,11 +5,12 @@ import toast from 'react-hot-toast';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { chatApi } from '../api/chatApi';
-import ErrorBoundary from './ErrorBoundary';
-
+import ErrorBoundary from './ErrorBoundary';import LoadingButton from './LoadingButton';
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+  failed?: boolean;
+  retrying?: boolean;
 }
 
 interface ChatBoxProps {
@@ -67,12 +68,51 @@ export default function ChatBox({ contextYaml, status, onChatActivity, onMessage
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
       toast.error(errorMessage);
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: `❌ ${errorMessage}`
-      }]);
+      // Mark the last assistant message as failed
+      setMessages(prev => {
+        const newMessages = [...prev];
+        const lastMessage = newMessages[newMessages.length - 1];
+        if (lastMessage && lastMessage.role === 'assistant') {
+          lastMessage.failed = true;
+        } else {
+          // If no assistant message exists, add a failed placeholder
+          newMessages.push({ role: 'assistant', content: '', failed: true });
+        }
+        return newMessages;
+      });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const retryMessage = async (messageIndex: number) => {
+    const messageToRetry = messages[messageIndex - 1]; // Get the user message before this assistant message
+    if (!messageToRetry || messageToRetry.role !== 'user') return;
+
+    // Mark as retrying
+    setMessages(prev => prev.map((msg, idx) => 
+      idx === messageIndex ? { ...msg, retrying: true, failed: false } : msg
+    ));
+
+    try {
+      const reply = await chatApi.sendMessage({
+        message: messageToRetry.content,
+        context: contextYaml,
+        history: messages.slice(0, messageIndex).map(m => ({
+          role: (m.role === 'assistant' ? 'model' : 'user') as 'user' | 'model',
+          parts: [{ text: m.content }]
+        })).slice(-10)
+      });
+
+      setMessages(prev => prev.map((msg, idx) => 
+        idx === messageIndex ? { role: 'assistant', content: reply, failed: false, retrying: false } : msg
+      ));
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Retry failed. Please try again.';
+      toast.error(errorMessage);
+      setMessages(prev => prev.map((msg, idx) => 
+        idx === messageIndex ? { ...msg, failed: true, retrying: false } : msg
+      ));
     }
   };
   return (
@@ -160,6 +200,30 @@ export default function ChatBox({ contextYaml, status, onChatActivity, onMessage
                     </ReactMarkdown>
                   </ErrorBoundary>
                 </div>
+                {msg.failed && msg.role === 'assistant' && (
+                  <button
+                    onClick={() => retryMessage(index)}
+                    disabled={msg.retrying}
+                    className="mt-2 px-3 py-1 bg-red-600/20 hover:bg-red-600/30 text-red-400 text-xs rounded-md border border-red-600/30 hover:border-red-500/50 transition-all disabled:opacity-50 flex items-center gap-1"
+                  >
+                    {msg.retrying ? (
+                      <>
+                        <svg className="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Retrying...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Retry
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
               <span className="text-[10px] text-slate-500 mt-1 px-1 uppercase font-bold">
                 {msg.role === 'user' ? 'You' : 'Ops Agent'}
@@ -201,15 +265,15 @@ export default function ChatBox({ contextYaml, status, onChatActivity, onMessage
             disabled={status !== 'ready' || isLoading}
             className="flex-1 bg-slate-900/50 backdrop-blur-sm border border-slate-600/50 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-sm text-white focus:outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 transition-all disabled:opacity-50 placeholder-slate-500"
           />
-          <motion.button
+          <LoadingButton
             type="submit"
-            disabled={status !== 'ready' || !input.trim() || isLoading}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 disabled:bg-slate-700 px-3 sm:px-4 py-2 sm:py-3 rounded-lg text-sm font-semibold transition-all flex items-center justify-center min-w-[60px] sm:min-w-[64px] shadow-lg shadow-cyan-500/25"
+            loading={isLoading}
+            loadingText="..."
+            disabled={status !== 'ready' || !input.trim()}
+            className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 px-3 sm:px-4 py-2 sm:py-3 rounded-lg text-sm font-semibold shadow-lg shadow-cyan-500/25 min-w-[60px] sm:min-w-[64px]"
           >
-            {isLoading ? '...' : 'Send'}
-          </motion.button>
+            Send
+          </LoadingButton>
         </form>
       </div>
     </motion.div>

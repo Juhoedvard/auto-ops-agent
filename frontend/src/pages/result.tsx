@@ -14,6 +14,7 @@ import Benefits from '../components/Benefits';
 import ImplementationSteps from '../components/ImplementationSteps';
 import DetailedAnalysis from '../components/DetailedAnalysis';
 import ChatBox from '../components/ChatBox';
+import LoadingButton from '../components/LoadingButton';
 
 export default function Result() {
   const { jobId } = useParams<{ jobId: string }>();
@@ -31,11 +32,25 @@ export default function Result() {
       navigate('/'); 
       return;
     }
+    
+    const MAX_POLL_ATTEMPTS = 120; 
+    const POLL_INTERVAL = 2000;
     let active = true;
+    let pollCount = 0;
+    let consecutiveErrors = 0;
+    
     const poll = async () => {
-      if (!active) return;
+      if (!active || pollCount >= MAX_POLL_ATTEMPTS) {
+        if (pollCount >= MAX_POLL_ATTEMPTS) {
+          setError("Analysis is taking longer than expected. Please refresh the page or contact support if the issue persists.");
+        }
+        return;
+      }
+      
       try {
         const data = await analysisApi.checkStatus(jobId);
+        pollCount++;
+        consecutiveErrors = 0; 
         setStatus(data.status);
 
         if (data.status === 'ready' && data.result) {
@@ -46,11 +61,21 @@ export default function Result() {
           setError(data.error || 'Analysis failed');
           active = false;
         } else {
-          setTimeout(poll, 2000); 
+          setTimeout(poll, POLL_INTERVAL); 
         }
       } catch (err) {
-        setError("Connection to server failed.");
-        active = false;
+        pollCount++;
+        consecutiveErrors++;
+        
+        
+        if (consecutiveErrors < 3) {
+          console.warn(`Polling attempt ${pollCount} failed, retrying... (${consecutiveErrors}/3)`);
+          setTimeout(poll, POLL_INTERVAL);
+        } else {
+          
+          setError("Unable to connect to server. Please check your internet connection and try again.");
+          active = false;
+        }
       }
     };
 
@@ -58,11 +83,10 @@ export default function Result() {
     return () => { active = false; };
   }, [jobId, navigate]);
 
-  // Auto-switch to chat view when chat has messages
+  
   useEffect(() => {
     if (analysis && activeSection === 'main') {
-      // This could be enhanced to check if ChatBox has messages
-      // For now, we'll keep it simple
+
     }
   }, [analysis, activeSection]);
 
@@ -83,16 +107,17 @@ export default function Result() {
         ...analysis,
         yaml_config: result.yaml 
       });
+      toast.success('YAML configuration regenerated successfully!', { duration: 3000 });
     } catch (err) {
       console.error("Failed to refetch YAML:", err);
-      setError("Failed to regenerate YAML. Please try again.");
+      toast.error('Failed to regenerate YAML. Please try again.', { duration: 4000 });
     } finally {
       setIsRefetching(false);
     }
   }
 
   return (
-    <div className="flex flex-col min-h-screen w-full p-4 lg:p-8 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
+    <div className="flex flex-col min-h-screen w-full p-4 lg:p-8 bg-linear-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
       <header className="w-full flex items-center justify-between mb-8 border-b border-slate-700/50 pb-4">
         <div className="flex items-center gap-4">
           <button 
@@ -165,13 +190,14 @@ export default function Result() {
                             <p className="italic opacity-70">The analysis might have skipped this part or failed.</p>
                           </div>
                           
-                          <button 
+                          <LoadingButton
                             onClick={(e) => {refetchYaml(e)}}
-                            disabled={isRefetching}
-                            className="px-6 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-sm font-bold rounded-lg transition-all shadow-lg shadow-cyan-500/25 active:scale-95 border border-cyan-400/20 flex items-center gap-2 disabled:opacity-50"
+                            loading={isRefetching}
+                            loadingText="Regenerating..."
+                            className="px-6 py-2 bg-linear-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-sm font-bold rounded-lg shadow-lg shadow-cyan-500/25 active:scale-95 border border-cyan-400/20"
                           >
-                            <span>↻</span> {isRefetching ? 'Regenerating...' : 'Refetch YAML'}
-                          </button>
+                            <span>↻</span> Refetch YAML
+                          </LoadingButton>
                       </div>
                   )}
                   <Benefits benefits={analysis.benefits} />
@@ -186,7 +212,7 @@ export default function Result() {
           layout
           className={`shrink-0 transition-all duration-300 ${
             activeSection === 'chat' 
-              ? 'w-full lg:w-[600px] xl:w-[700px]' 
+              ? 'w-full lg:w-150 xl:w-175' 
               : 'w-full lg:w-64 xl:w-72'
           }`}
           onClick={() => setActiveSection('chat')}

@@ -1,5 +1,4 @@
 
-import type { MouseEvent } from 'react';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
