@@ -18,6 +18,10 @@ interface ChatResponse {
   reply: string;
 }
 
+interface ApiErrorData {
+  detail?: string;
+}
+
 
 const api = axios.create({
   baseURL: 'http://localhost:8000',
@@ -40,26 +44,29 @@ export const chatApi = {
 
       return response.data.reply;
 
-    } catch (error: any) {
-      if (error.code === 'ECONNABORTED') {
-        throw new Error('Connection timeout. The AI service is taking too long to respond.');
+    } catch (error: unknown) {
+      if (axios.isAxiosError<ApiErrorData>(error)) {
+        if (error.code === 'ECONNABORTED') {
+          throw new Error('Connection timeout. The AI service is taking too long to respond.');
+        }
+        
+        if (!error.response) {
+          throw new Error('No connection to the server.');
+        }
+
+        const status = error.response.status;
+        const serverMessage = error.response.data?.detail || error.message;
+
+        console.error(`Chat API Error [${status}]:`, serverMessage);
+
+        if (status === 500) {
+          throw new Error('Server error occurred while processing the AI request.');
+        }
+
+        throw new Error(serverMessage || 'Unknown error occurred while sending the message.');
       }
       
-      if (!error.response) {
-        throw new Error('No connection to the server.');
-      }
-
-
-      const status = error.response.status;
-      const serverMessage = error.response.data?.detail || error.message;
-
-      console.error(`Chat API Error [${status}]:`, serverMessage);
-
-      if (status === 500) {
-        throw new Error('Server error occurred while processing the AI request.');
-      }
-
-      throw new Error(serverMessage || 'Unknown error occurred while sending the message.');
+      throw error instanceof Error ? error : new Error('An unexpected error occurred');
     }
   }
 };
