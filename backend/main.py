@@ -157,15 +157,6 @@ async def analyze_repository(repo_url: str, job_id: str):
         
         raw_json = json.loads(response.text)
 
-        # --- TESTING ONLY: Force empty YAML to show the Refetch button ---
-        #if "yaml_config" in raw_json:
-        #    raw_json["yaml_config"] = ""
-       
-        raw_json = json.loads(response.text)
-
-        # --- TESTING ONLY: Force empty YAML to show the Refetch button ---
-        #if "yaml_config" in raw_json:
-        #    raw_json["yaml_config"] = ""
 
         analysis_jobs[job_id]["result"] = sanitize_analysis_result(raw_json)
         analysis_jobs[job_id]["status"] = "ready"
