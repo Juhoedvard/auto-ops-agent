@@ -21,6 +21,10 @@ export interface ApiError {
   detail: string | { msg: string; type: string }[]; // FastAPI:n standardi
 }
 
+interface ApiErrorData {
+  detail?: string;
+}
+
 
 const api = axios.create({
   baseURL: 'http://localhost:8000',
