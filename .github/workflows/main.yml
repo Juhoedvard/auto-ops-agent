@@ -23,10 +23,10 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build backend image
-        run: docker build -t auto-ops-backend:latest -f backend/Dockerfile .
+        run: docker build -t auto-ops-backend:latest -f backend/Dockerfile ./backend
 
       - name: Build frontend image
-        run: docker build -t auto-ops-frontend:latest -f frontend/Dockerfile .
+        run: docker build -t auto-ops-frontend:latest -f frontend/Dockerfile ./frontend
 
 
       - name: Set up Node.js
