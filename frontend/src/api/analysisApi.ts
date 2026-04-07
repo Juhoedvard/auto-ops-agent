@@ -4,8 +4,9 @@ import type { AnalysisResult, JobStatus } from '../types/analysis';
 
 type AnalysisContext =  Pick<AnalysisResult, 'overview' | 'analysis'> & { jobId: string };
 
+const BASE_URL  = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 const api = axios.create({
-  baseURL: 'http://localhost:8000',
+  baseURL: BASE_URL,
   timeout: 30000, // 30 second timeout
 });
 

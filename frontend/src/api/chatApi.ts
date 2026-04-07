@@ -21,10 +21,10 @@ export interface ApiError {
   detail: string | { msg: string; type: string }[]; // FastAPI:n standardi
 }
 
-
+const BASE_URL  = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 const api = axios.create({
-  baseURL: 'http://localhost:8000',
+  baseURL: BASE_URL,
   timeout: 20000,
   headers: {
     'Content-Type': 'application/json',
