@@ -1,7 +1,8 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import { type HTMLMotionProps } from 'framer-motion';
 
-interface LoadingButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+interface LoadingButtonProps extends HTMLMotionProps<'button'> {
   loading?: boolean;
   loadingText?: string;
   spinnerSize?: 'sm' | 'md' | 'lg';
@@ -30,7 +31,7 @@ export default function LoadingButton({
         disabled || loading ? 'opacity-50 cursor-not-allowed' : ''
       } ${className}`}
       disabled={disabled || loading}
-      {...(props as any)}
+      {...props}
     >
       {loading ? (
         <>

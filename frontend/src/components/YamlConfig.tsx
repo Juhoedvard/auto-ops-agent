@@ -15,8 +15,9 @@ export default function YamlConfig({ code }: YamlConfigProps) {
     try {
       await navigator.clipboard.writeText(code);
       toast.success('YAML configuration copied to clipboard!', { duration: 2000 });
-    } catch (err) {
-      // Fallback for older browsers
+    } catch (err: unknown) {
+      console.debug('Clipboard API failed, attempting fallback...', err);
+
       const textArea = document.createElement("textarea");
       textArea.value = code;
       document.body.appendChild(textArea);
@@ -24,7 +25,7 @@ export default function YamlConfig({ code }: YamlConfigProps) {
       try {
         document.execCommand('copy');
         toast.success('YAML configuration copied to clipboard!', { duration: 2000 });
-      } catch (fallbackErr) {
+      } catch (fallbackErr: unknown) {
         console.error("Copy failed", fallbackErr);
         toast.error('Failed to copy to clipboard');
       }
@@ -73,7 +74,7 @@ export default function YamlConfig({ code }: YamlConfigProps) {
           <div className="rounded-md overflow-hidden border border-gray-800 shadow-lg">
             <SyntaxHighlighter
               language="yaml"
-              style={vscDarkPlus}
+              style={vscDarkPlus as Record<string, React.CSSProperties>}
               customStyle={{
                 margin: 0,
                 padding: '1rem',

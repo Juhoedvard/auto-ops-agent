@@ -63,16 +63,16 @@ export default function Result() {
         } else {
           setTimeout(poll, POLL_INTERVAL); 
         }
-      } catch (err) {
+      } catch (err: unknown) {
         pollCount++;
         consecutiveErrors++;
         
         
         if (consecutiveErrors < 3) {
-          console.warn(`Polling attempt ${pollCount} failed, retrying... (${consecutiveErrors}/3)`);
+          console.warn(`Polling attempt ${pollCount} failed, retrying... (${consecutiveErrors}/3)`, err);
           setTimeout(poll, POLL_INTERVAL);
         } else {
-          
+          console.error("Polling failed permanently after consecutive errors:", err);
           setError("Unable to connect to server. Please check your internet connection and try again.");
           active = false;
         }
@@ -82,13 +82,6 @@ export default function Result() {
     poll();
     return () => { active = false; };
   }, [jobId, navigate]);
-
-  
-  useEffect(() => {
-    if (analysis && activeSection === 'main') {
-
-    }
-  }, [analysis, activeSection]);
 
   const refetchYaml = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -108,7 +101,7 @@ export default function Result() {
         yaml_config: result.yaml 
       });
       toast.success('YAML configuration regenerated successfully!', { duration: 3000 });
-    } catch (err) {
+    } catch (err: unknown) {
       console.error("Failed to refetch YAML:", err);
       toast.error('Failed to regenerate YAML. Please try again.', { duration: 4000 });
     } finally {

@@ -47,7 +47,7 @@ export default function Home() {
       clearTimeout(timeoutId);
       toast.success('Analysis started successfully!', { id: 'analysis' });
       navigate(`/result/${jobId}`);
-    } catch (err) {
+    } catch (err: unknown) {
       clearTimeout(timeoutId);
       console.error('Error starting analysis:', err);
       setLoading(false);

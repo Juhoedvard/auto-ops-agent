@@ -17,6 +17,9 @@ interface ChatRequest {
 interface ChatResponse {
   reply: string;
 }
+export interface ApiError {
+  detail: string | { msg: string; type: string }[]; // FastAPI:n standardi
+}
 
 
 const api = axios.create({
@@ -40,26 +43,36 @@ export const chatApi = {
 
       return response.data.reply;
 
-    } catch (error: any) {
-      if (error.code === 'ECONNABORTED') {
-        throw new Error('Connection timeout. The AI service is taking too long to respond.');
+    } catch (error: unknown) {
+      if (axios.isAxiosError<ApiError>(error)) {
+        if (error.code === 'ECONNABORTED') {
+          throw new Error('Connection timeout. The AI service is taking too long to respond.');
+        }
+        
+        if (!error.response) {
+          throw new Error('No connection to the server.');
+        }
+
+        const status = error.response.status;
+        const detail = error.response.data?.detail;
+        
+        // Parse FastAPI detail which can be a string or array of error objects
+        const serverMessage = typeof detail === 'string'
+          ? detail
+          : Array.isArray(detail)
+            ? detail.map(err => err.msg).join(', ')
+            : error.message;
+
+        console.error(`Chat API Error [${status}]:`, serverMessage);
+
+        if (status === 500) {
+          throw new Error('Server error occurred while processing the AI request.');
+        }
+
+        throw new Error(serverMessage || 'Unknown error occurred while sending the message.');
       }
       
-      if (!error.response) {
-        throw new Error('No connection to the server.');
-      }
-
-
-      const status = error.response.status;
-      const serverMessage = error.response.data?.detail || error.message;
-
-      console.error(`Chat API Error [${status}]:`, serverMessage);
-
-      if (status === 500) {
-        throw new Error('Server error occurred while processing the AI request.');
-      }
-
-      throw new Error(serverMessage || 'Unknown error occurred while sending the message.');
+      throw error instanceof Error ? error : new Error('An unexpected error occurred');
     }
   }
 };

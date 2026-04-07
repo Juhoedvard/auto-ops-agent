@@ -65,7 +65,7 @@ export default function ChatBox({ contextYaml, status, onChatActivity, onMessage
 
       setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
 
-    } catch (err) {
+    } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
       toast.error(errorMessage);
       // Mark the last assistant message as failed
@@ -107,7 +107,7 @@ export default function ChatBox({ contextYaml, status, onChatActivity, onMessage
       setMessages(prev => prev.map((msg, idx) => 
         idx === messageIndex ? { role: 'assistant', content: reply, failed: false, retrying: false } : msg
       ));
-    } catch (err) {
+    } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Retry failed. Please try again.';
       toast.error(errorMessage);
       setMessages(prev => prev.map((msg, idx) => 
@@ -168,23 +168,22 @@ export default function ChatBox({ contextYaml, status, onChatActivity, onMessage
             >
               <div className={`max-w-[90%] px-3 sm:px-4 py-2 sm:py-3 rounded-2xl text-sm ${
                 msg.role === 'user'
-                  ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-tr-none shadow-lg shadow-cyan-500/25'
+                  ? 'bg-linear-to-r from-cyan-500 to-blue-600 text-white rounded-tr-none shadow-lg shadow-cyan-500/25'
                   : 'bg-slate-700/50 backdrop-blur-sm text-slate-200 border border-slate-600/50 rounded-tl-none shadow-sm'
               }`}>
                 <div className="prose prose-invert prose-sm max-w-none">
                   <ErrorBoundary>
                     <ReactMarkdown
                       components={{
-                        code({node, className, children, ...props}: any) {
+                        code({  className, children, ...props }: React.ComponentPropsWithoutRef<'code'>) {
                           const inline = !className
                           const match = /language-(\w+)/.exec(className || '')
                           return !inline && match ? (
                             <SyntaxHighlighter
-                              style={vscDarkPlus}
+                              style={vscDarkPlus as Record<string, React.CSSProperties>}
                               language={match[1]}
                               PreTag="div"
                               customStyle={{ margin: '0.5em 0', borderRadius: '4px', fontSize: '11px' }}
-                              {...props}
                             >
                               {String(children).replace(/\n$/, '')}
                             </SyntaxHighlighter>
@@ -270,7 +269,7 @@ export default function ChatBox({ contextYaml, status, onChatActivity, onMessage
             loading={isLoading}
             loadingText="..."
             disabled={status !== 'ready' || !input.trim()}
-            className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 px-3 sm:px-4 py-2 sm:py-3 rounded-lg text-sm font-semibold shadow-lg shadow-cyan-500/25 min-w-[60px] sm:min-w-[64px]"
+            className="bg-linear-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 px-3 sm:px-4 py-2 sm:py-3 rounded-lg text-sm font-semibold shadow-lg shadow-cyan-500/25 min-w-[60px] sm:min-w-[64px]"
           >
             Send
           </LoadingButton>
