@@ -76,6 +76,7 @@ jobs:
           context: ./backend
           file: ./backend/Dockerfile
           push: true 
+          pull: true
           tags : |
             ${{ secrets.DOCKER_USERNAME }}/auto-ops-backend:latest
             ${{ secrets.DOCKER_USERNAME }}/auto-ops-backend:${{ github.sha }}
@@ -86,6 +87,7 @@ jobs:
           context: ./frontend
           file: ./frontend/Dockerfile
           push: true 
+          pull: true
           tags : |
             ${{ secrets.DOCKER_USERNAME }}/auto-ops-frontend:latest
             ${{ secrets.DOCKER_USERNAME }}/auto-ops-frontend:${{ github.sha }}
