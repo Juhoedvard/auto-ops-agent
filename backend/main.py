@@ -11,11 +11,20 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Any
 
-app = FastAPI()
+env = os.getenv("PYTHON_ENV", "development")
+
+if env == "production":
+    
+    print("Running in Production Mode")
+else:
+    print("Running in Development Mode")
+DEBUG_MODE = os.getenv("PYTHON_ENV", "development") == "development"
+app = FastAPI(debug=DEBUG_MODE)
 raw_origins = os.getenv("ALLOWED_ORIGINS", "*")
 
-# Muunnetaan merkkijono listaksi (esim. "url1,url2" -> ["url1", "url2"])
-# Jos arvo on pelkkä "*", pidetään se sellaisenaan listassa.
+
+
+
 if raw_origins == "*":
     origins = ["*"]
 else:
