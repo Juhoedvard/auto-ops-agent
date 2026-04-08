@@ -12,10 +12,19 @@ from pydantic import BaseModel
 from typing import List, Optional, Any
 
 app = FastAPI()
+raw_origins = os.getenv("ALLOWED_ORIGINS", "*")
+
+# Muunnetaan merkkijono listaksi (esim. "url1,url2" -> ["url1", "url2"])
+# Jos arvo on pelkkä "*", pidetään se sellaisenaan listassa.
+if raw_origins == "*":
+    origins = ["*"]
+else:
+    origins = [o.strip() for o in raw_origins.split(",")]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
