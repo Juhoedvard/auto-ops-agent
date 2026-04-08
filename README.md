@@ -1,5 +1,5 @@
 Auto-Ops AI Agent 🚀
-[![CI](https://github.com/Juhoedvard/auto-ops-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/Juhoedvard/auto-ops-agent/actions/workflows/ci.yml)
+[![CI/CD Pipeline](https://github.com/Juhoedvard/auto-ops-agent/actions/workflows/main.yml/badge.svg)](https://github.com/Juhoedvard/auto-ops-agent/actions/workflows/main.yml)
 
 Tämä projekti on aktiivisessa kehitysvaiheessa. Core-ominaisuudet (analyysi ja generointi) toimivat, mutta käyttöliittymän hienosäätö ja virhekäsittely ovat vielä työn alla.
 
