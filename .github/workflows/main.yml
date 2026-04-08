@@ -17,41 +17,27 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build backend image and push image to Docker Hub
-        uses: docker/build-push-action@v5
-        with:
-          context: ./backend
-          file: ./backend/Dockerfile
-          push: ${{ github.event_name != 'pull_request' }}
-          tags : |
-            ${{ secrets.DOCKER_USERNAME }}/auto-ops-backend:latest
-            ${{ secrets.DOCKER_PASSWORD }}/auto-ops-backend:${{ github.sha }}
+      - name: Build backend image
+        run: docker build -t auto-ops-backend:latest -f backend/Dockerfile ./backend
 
-      - name: Build frontend image and push image to Docker Hub
-        uses: docker/build-push-action@v5
-        with:
-          context: ./frontend
-          file: ./frontend/Dockerfile
-          push: ${{ github.event_name != 'pull_request' }}
-          tags : |
-            ${{ secrets.DOCKER_USERNAME }}/auto-ops-frontend:latest
-            ${{ secrets.DOCKER_PASSWORD }}/auto-ops-frontend:${{ github.sha }}    
+      - name: Build frontend image
+        run: docker build -t auto-ops-frontend:latest -f frontend/Dockerfile ./frontend
 
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '24' 
+          node-version: '24' # Or your project's Node.js version
 
       - name: Install dependencies
         working-directory: ./frontend
-        run: npm install 
+        run: npm install # Or yarn install, pnpm install
 
       - name: Build project
         working-directory: ./frontend
-        run: npm run build 
+        run: npm run build # Or yarn build, pnpm build
