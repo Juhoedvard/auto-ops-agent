@@ -13,13 +13,14 @@ export default defineConfig({
     watch: {
       usePolling: true,
     },
-    allowedHosts: ['auto-ops-frontend.onrender.com'],
+    allowedHosts: ['.onrender.com'],
     host: "0.0.0.0",
     strictPort: true,
     port: Number(process.env.PORT) || 5173,
   },
   preview: {
-    allowedHosts:['auto-ops-frontend.onrender.com'],
+
+    allowedHosts: ['.onrender.com'],
     host: '0.0.0.0',
     port: Number(process.env.PORT) || 10000,
   }

@@ -18,7 +18,10 @@ FROM node:24-slim AS production
 WORKDIR /app
 
 COPY --from=build /app/dist ./dist
+
 COPY --from=build /app/package*.json ./
+
+COPY --from=build /app/vite.config.ts ./
 
 RUN npm install --omit=dev && npm install vite
 
