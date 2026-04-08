@@ -104,4 +104,10 @@ jobs:
         run: |
           echo "Deployment step placeholder."
           echo "Add your Docker registry, cloud provider, or hosting deployment steps here."
-      
+
+      - name: Trigger Render Frontend Redeploy
+        run: curl -X POST ${{ secrets.RENDER_FRONTEND_DEPLOY_HOOK }}
+        env:
+          RENDER_FRONTEND_DEPLOY_HOOK: ${{ secrets.RENDER_FRONTEND_DEPLOY_HOOK }}
+
+
