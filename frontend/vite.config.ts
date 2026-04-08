@@ -13,8 +13,15 @@ export default defineConfig({
     watch: {
       usePolling: true,
     },
-    host: true,
+    allowedHosts: true,
+    host: "0.0.0.0",
     strictPort: true,
-    port: 5173,
+    port: Number(process.env.PORT) || 5173,
+  },
+  preview: {
+    // Sama asetus preview-moodille (jos käytät npm run preview)
+    allowedHosts: true,
+    host: '0.0.0.0',
+    port: Number(process.env.PORT) || 10000,
   }
 })

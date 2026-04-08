@@ -1,20 +1,27 @@
-# 1. Käytetään kevyttä Node-imagea
-FROM node:20-slim
 
-# 2. Asetetaan työkansio kontin sisällä
+FROM node:20-slim AS base
 WORKDIR /app
-
-# 3. Kopioidaan pakettilistat ensin (optimoi välimuistin käyttöä)
 COPY package*.json ./
-
-# 4. Asennetaan riippuvuudet
 RUN npm install
 
-# 5. Kopioidaan loput tiedostot
+
+FROM base AS development
 COPY . .
+EXPOSE 3000
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "3000"]
 
-# 6. Avataan portti 5173 (Viten oletus)
-EXPOSE 5173
+FROM base AS build
+COPY . .
+RUN npm run build
 
-# 7. Käynnistyskomento (Vite tarvitsee --host-lipun Dockerissa)
-CMD ["npm", "run", "dev", "--", "--host"]
+FROM node:20-slim AS production
+WORKDIR /app
+
+COPY --from=build /app/dist ./dist
+COPY --from=build /app/package*.json ./
+
+RUN npm install --omit=dev && npm install vite
+
+EXPOSE 3000
+
+CMD ["npx", "vite", "preview", "--host", "0.0.0.0", "--port", "3000"]
