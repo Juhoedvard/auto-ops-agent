@@ -1,41 +1,106 @@
 name: CI/CD Pipeline
 
 on:
-  push:
-    branches:
-      - main
+  push: 
+    branches: [ main, master ]
   pull_request:
-    branches:
-      - main
+    branches: [ main, master ] 
+  workflow_dispatch: 
 
 jobs:
-  build:
+  backend-ci:
+    name: Backend check
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Validate backend Python syntax
+        run: python -m compileall backend
+
+  frontend-ci:
+    name: Frontend check and build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Run frontend lint
+        run: npm run lint
+        working-directory: frontend
+
+      - name: Build frontend
+        run: npm run build
+        working-directory: frontend
+
+  docker-build-and-push:
+    name: Build and Push Docker Images
+    needs: [ backend-ci, frontend-ci ] 
+    runs-on: ubuntu-latest
+
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'))
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Log in to Docker Hub
-        if : github.event_name != 'pull_request' 
-        uses: docker/login-action@v3
+        uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build and push backend image
-        uses: docker/build-push-action@v5
+      - name: Build backend image and push to Docker Hub
+        uses: docker/build-push-action@v5 
         with:
           context: ./backend
           file: ./backend/Dockerfile
-          push: ${{ github.event_name != 'pull_request' }} # Only push on non-PR events
-          tags: ${{ secrets.DOCKER_USERNAME }}/auto-ops-backend:latest
+          push: true 
+          tags : |
+            ${{ secrets.DOCKER_USERNAME }}/auto-ops-backend:latest
+            ${{ secrets.DOCKER_USERNAME }}/auto-ops-backend:${{ github.sha }}
 
-
-      - name: Build and push frontend image
-        uses: docker/build-push-action@v5
+      - name: Build frontend image and push to Docker Hub
+        uses: docker/build-push-action@v5 
         with:
           context: ./frontend
           file: ./frontend/Dockerfile
-          push: ${{ github.event_name != 'pull_request' }} # Only push on non-PR events
-          tags: ${{ secrets.DOCKER_USERNAME }}/auto-ops-frontend:latest
+          push: true 
+          tags : |
+            ${{ secrets.DOCKER_USERNAME }}/auto-ops-frontend:latest
+            ${{ secrets.DOCKER_USERNAME }}/auto-ops-frontend:${{ github.sha }}
+
+  deploy:
+    name: Deployment placeholder
+    needs: [ docker-build-and-push ] 
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'))
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deployment placeholder
+        run: |
+          echo "Deployment step placeholder."
+          echo "Add your Docker registry, cloud provider, or hosting deployment steps here."
