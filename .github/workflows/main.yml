@@ -20,6 +20,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: 'pip'
 
       - name: Install backend dependencies
         run: |
@@ -40,6 +41,7 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: '24'
+          cache: 'npm'
 
       - name: Install frontend dependencies
         run: npm ci
@@ -80,6 +82,8 @@ jobs:
           tags : |
             ${{ secrets.DOCKER_USERNAME }}/auto-ops-backend:latest
             ${{ secrets.DOCKER_USERNAME }}/auto-ops-backend:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Build frontend image and push to Docker Hub
         uses: docker/build-push-action@v5 
@@ -91,7 +95,8 @@ jobs:
           tags : |
             ${{ secrets.DOCKER_USERNAME }}/auto-ops-frontend:latest
             ${{ secrets.DOCKER_USERNAME }}/auto-ops-frontend:${{ github.sha }}
-
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
   deploy:
     name: Deployment placeholder
     needs: [ docker-build-and-push ] 
