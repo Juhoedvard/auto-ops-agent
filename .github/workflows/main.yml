@@ -99,6 +99,8 @@ jobs:
           tags : |
             ${{ secrets.DOCKER_USERNAME }}/auto-ops-frontend:latest
             ${{ secrets.DOCKER_USERNAME }}/auto-ops-frontend:${{ github.sha }}
+          build-args: |
+            VITE_API_URL=${{ secrets.VITE_API_URL }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
   deploy:
