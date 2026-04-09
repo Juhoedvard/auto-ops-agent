@@ -4,6 +4,7 @@ import asyncio
 import shutil
 import tempfile
 import json
+import logging
 from pathlib import Path
 from google import genai
 from fastapi import FastAPI, HTTPException, BackgroundTasks 
@@ -11,13 +12,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Any
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
+
 env = os.getenv("PYTHON_ENV", "development")
 
 if env == "production":
-    
-    print("Running in Production Mode")
+    logger.info("Running in Production Mode")
 else:
-    print("Running in Development Mode")
+    logger.info("Running in Development Mode")
 DEBUG_MODE = os.getenv("PYTHON_ENV", "development") == "development"
 app = FastAPI(debug=DEBUG_MODE)
 raw_origins = os.getenv("ALLOWED_ORIGINS", "*")
@@ -106,6 +113,7 @@ def sanitize_analysis_result(raw_data: Any) -> dict:
 async def analyze_repository(repo_url: str, job_id: str):
     temp_dir = tempfile.mkdtemp()
     
+    logger.info(f"Starting analysis for job {job_id}: {repo_url}")
     try: 
         analysis_jobs[job_id]["status"] = "cloning"
         
@@ -123,6 +131,7 @@ async def analyze_repository(repo_url: str, job_id: str):
                 raise Exception(f"Git clone failed: {stderr_text}")
         except asyncio.TimeoutError:
             raise Exception("Repository clone timed out. The repository may be too large or the connection is slow.")
+        logger.info(f"Successfully cloned {repo_url} for job {job_id}")
         
         analysis_jobs[job_id]["status"] = "analyzing"
         
@@ -178,8 +187,10 @@ async def analyze_repository(repo_url: str, job_id: str):
 
         analysis_jobs[job_id]["result"] = sanitize_analysis_result(raw_json)
         analysis_jobs[job_id]["status"] = "ready"
+        logger.info(f"Analysis complete for job {job_id}")
         
     except Exception as e:
+        logger.error(f"Job {job_id} failed: {str(e)}")
         analysis_jobs[job_id]["status"] = "failed"
         analysis_jobs[job_id]["error"] = str(e)
     finally:
@@ -201,6 +212,7 @@ async def get_status(job_id: str):
 @app.post("/analyze")
 async def start_analysis(request: RepoRequest, background_tasks: BackgroundTasks):
     job_id = str(uuid.uuid4())
+    logger.info(f"Received analysis request for {request.url}. Job ID: {job_id}")
     analysis_jobs[job_id] = {"status": "pending", "result": None, "error": None}
     background_tasks.add_task(analyze_repository, request.url.strip(), job_id)
     return {"jobId": job_id}
@@ -208,6 +220,7 @@ async def start_analysis(request: RepoRequest, background_tasks: BackgroundTasks
 @app.post("/refetchYaml")
 async def refetch_yaml(request: YamlRequest):
     try:
+        logger.info("Refetching YAML configuration based on existing analysis")
         prompt = f"""
         Based on the following project overview and technical analysis, 
         generate a complete and valid CI/CD YAML configuration file (e.g., GitHub Actions).
@@ -227,11 +240,13 @@ async def refetch_yaml(request: YamlRequest):
         )
         return json.loads(response.text)
     except Exception as e:
+        logger.error(f"Error in refetchYaml: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/chat")
 async def chat_with_gemini(request: ChatRequest):
     try:
+        logger.info(f"Processing chat request. History length: {len(request.history)}")
         history = []
         for msg in request.history:
             if msg.parts and msg.parts[0].text:
@@ -263,6 +278,7 @@ async def chat_with_gemini(request: ChatRequest):
         )
         return {"reply": response.text}
     except Exception as e:
+        logger.error(f"Error in chat endpoint: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
