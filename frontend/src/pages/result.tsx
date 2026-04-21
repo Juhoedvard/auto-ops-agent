@@ -25,8 +25,21 @@ export default function Result() {
   const [error, setError] = useState<string | null>(null);
   const [isRefetching, setIsRefetching] = useState(false);
   const [activeSection, setActiveSection] = useState<'main' | 'chat'>('main');
+  const [cooldown, setCooldown] = useState(0);
 
+  // Visual timer for the 'Retry' button when Gemini is at capacity
+  useEffect(() => {
+    if (cooldown > 0) {
+      const timer = setTimeout(() => setCooldown(cooldown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [cooldown]);
 
+  /**
+   * Polling Logic:
+   * Continually checks the backend status endpoint until the job is 'ready' or 'failed'.
+   * Includes basic exponential backoff for network-level consecutive errors.
+   */
   useEffect(() => {
     if (!jobId) {
       navigate('/'); 
@@ -83,6 +96,7 @@ export default function Result() {
     return () => { active = false; };
   }, [jobId, navigate]);
 
+  // Calls the backend to regenerate just the YAML if the result was incomplete
   const refetchYaml = async (e: React.MouseEvent) => {
     e.preventDefault();
     if (!analysis || isRefetching) return;
@@ -108,6 +122,25 @@ export default function Result() {
       setIsRefetching(false);
     }
   }
+
+  // Triggered manually when the AI returns 'AI_MODEL_BUSY'
+  const handleRetry = async () => {
+    const savedUrl = localStorage.getItem('pending_repo_url');
+    if (!savedUrl) {
+      toast.error("No repository URL found to retry.");
+      return;
+    }
+
+    setCooldown(15);
+    try {
+      toast.loading('Retrying analysis...', { id: 'retry' });
+      const newJobId = await analysisApi.startAnalysis(savedUrl);
+      toast.success('Retry started!', { id: 'retry' });
+      navigate(`/result/${newJobId}`);
+    } catch (err) {
+      toast.error('Failed to restart analysis. AI may still be busy.', { id: 'retry' });
+    }
+  };
 
   return (
     <div className="flex flex-col min-h-screen w-full p-4 lg:p-8 bg-linear-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
@@ -164,8 +197,25 @@ export default function Result() {
                 <div className="h-full flex flex-col items-center justify-center text-center">
                   <div className="text-red-400 text-4xl mb-4">⚠️</div>
                   <h2 className="text-xl font-bold mb-2">Analysis Failed</h2>
-                  <p className="text-slate-400">{error}</p>
-                  <button onClick={() => navigate('/')} className="mt-6 text-cyan-400 hover:text-cyan-300 hover:underline">Try another repository</button>
+                  <p className="text-slate-400 mb-6">
+                    {error === 'AI_MODEL_BUSY' 
+                      ? "Gemini is currently at capacity. This is usually temporary." 
+                      : error}
+                  </p>
+                  
+                  {error === 'AI_MODEL_BUSY' ? (
+                    <button
+                      onClick={handleRetry}
+                      disabled={cooldown > 0}
+                      className={`px-8 py-3 rounded-xl font-bold transition-all ${
+                        cooldown > 0 ? 'bg-slate-700 text-slate-500 cursor-not-allowed' : 'bg-cyan-500 hover:bg-cyan-400 text-slate-900 shadow-lg shadow-cyan-500/20'
+                      }`}
+                    >
+                      {cooldown > 0 ? `Retry in ${cooldown}s` : 'Retry Analysis Now'}
+                    </button>
+                  ) : (
+                    <button onClick={() => navigate('/')} className="text-cyan-400 hover:text-cyan-300 hover:underline">Try another repository</button>
+                  )}
                 </div>
               )}
 

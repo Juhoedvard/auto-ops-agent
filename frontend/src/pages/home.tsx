@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -9,14 +9,53 @@ import LoadingButton from '../components/LoadingButton';
 export default function Home() {
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isBackendWaking, setIsBackendWaking] = useState(false);
   const navigate = useNavigate();
   console.log(url)
 
+    useEffect(() => {
+    const wakeBackend = async () => {
+      let wakeToastId: string | undefined;
+      
+      // Only show the toast if the backend takes more than 1.5s to respond
+      // (This avoids annoying users if the backend is already awake)
+      const toastTimer = setTimeout(() => {
+        wakeToastId = toast.loading('Waking up backend services...', { 
+          id: 'wake-up',
+          position: 'top-center' 
+        });
+      }, 1500);
+
+      try {
+        setIsBackendWaking(true);
+        await analysisApi.ping();
+        
+        if (wakeToastId) {
+          toast.success('Backend is ready!', { id: 'wake-up' });
+        }
+      } catch (err) {
+        console.error('Failed to wake backend:', err);
+        if (wakeToastId) {
+          toast.error('Backend is taking a while, but we are still trying...', { id: 'wake-up' });
+        }
+      } finally {
+        clearTimeout(toastTimer);
+        setIsBackendWaking(false);
+      }
+    };
+
+    wakeBackend();
+  }, []);
+
+
+
+  // Simple regex to ensure the input is a valid GitHub URL format
   const isValidGithubUrl = (url: string): boolean => {
     const githubUrlPattern = /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+$/i;
     return githubUrlPattern.test(url.trim());
   };
 
+  // Primary handler for submitting a repository for analysis
   const handleStart = async (e: React.FormEvent) => {
     e.preventDefault();
     console.log("Starting analysis for URL:", url);
@@ -43,6 +82,10 @@ export default function Home() {
         toast.error('Analysis request timed out. Please try again.', { id: 'analysis' });
       }, 30000);
       
+      // Persistence: If the AI is busy (503), we retrieve this from 
+      // local storage on the results page to allow a manual retry.
+      localStorage.setItem('pending_repo_url', url.trim());
+
       const jobId = await analysisApi.startAnalysis(url);
       clearTimeout(timeoutId);
       toast.success('Analysis started successfully!', { id: 'analysis' });
@@ -122,14 +165,15 @@ export default function Home() {
               </svg>
             </div>
           </div>
-          <LoadingButton
+                    <LoadingButton
             type="submit"
-            loading={loading}
-            loadingText="Starting..."
+            loading={loading || isBackendWaking}
+            loadingText={isBackendWaking ? "Waking up backend..." : "Starting..."}
             className="w-full bg-linear-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 py-3 sm:py-4 rounded-xl font-bold shadow-xl shadow-cyan-500/25 hover:shadow-cyan-400/40 border border-cyan-400/20"
           >
             Analyze Repository
           </LoadingButton>
+
         </motion.form>
       </motion.div>
     </div>

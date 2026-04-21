@@ -82,10 +82,19 @@ export const analysisApi = {
       return response.data;
     });
   },
-  handleRegenerateYaml: async (ContextData: AnalysisContext) => {
+    handleRegenerateYaml: async (ContextData: AnalysisContext) => {
     return circuitBreaker.execute(async () => {
       const response = await api.post('refetchYaml', ContextData);
       return response.data;
     });
+  },
+
+  ping: async (): Promise<void> => {
+    try {
+      await api.get('/', { timeout: 60000 }); // Longer timeout for wake-up
+    } catch (e) {
+      console.warn('Ping failed, but service might still be waking up', e);
+    }
   }
 };
+
