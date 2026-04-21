@@ -137,7 +137,8 @@ export default function Result() {
       const newJobId = await analysisApi.startAnalysis(savedUrl);
       toast.success('Retry started!', { id: 'retry' });
       navigate(`/result/${newJobId}`);
-    } catch (err) {
+    } catch (err: unknown) {
+      console.error("Retry failed:", err);
       toast.error('Failed to restart analysis. AI may still be busy.', { id: 'retry' });
     }
   };
