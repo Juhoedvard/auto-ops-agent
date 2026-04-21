@@ -75,8 +75,16 @@ class YamlRequest(BaseModel):
 
 def sanitize_analysis_result(raw_data: Any) -> dict:
     """
-    Ensures that the AI response matches the expected structure and types.
-    This prevents frontend crashes by cleaning up inconsistencies.
+    Validates and cleans the raw JSON response from the AI model.
+    
+    This function ensures that mandatory fields exist and are of the correct type
+    (strings vs lists), preventing the frontend from crashing due to unexpected 
+    nulls or malformed data structures.
+    
+    Args:
+        raw_data: The unprocessed JSON-like output from Gemini.
+    Returns:
+        A dictionary containing sanitized strings and lists.
     """
     if not isinstance(raw_data, dict):
         return {}
@@ -111,8 +119,18 @@ def sanitize_analysis_result(raw_data: Any) -> dict:
 
 
 async def analyze_repository(repo_url: str, job_id: str):
-    temp_dir = tempfile.mkdtemp()
+    """
+    The core background task for repository analysis.
     
+    Workflow:
+    1. Creates a temporary directory and clones the repository (shallow clone).
+    2. Scans for configuration files (package.json, requirements.txt, etc.).
+    3. Sends file context to Gemini to generate a CI/CD strategy.
+    4. Handles 503 'Model Busy' errors by setting a specific error state.
+    5. Cleans up temporary files regardless of success or failure.
+    """
+    temp_dir = tempfile.mkdtemp()
+
     logger.info(f"Starting analysis for job {job_id}: {repo_url}")
     try: 
         analysis_jobs[job_id]["status"] = "cloning"
@@ -190,9 +208,13 @@ async def analyze_repository(repo_url: str, job_id: str):
         logger.info(f"Analysis complete for job {job_id}")
         
     except Exception as e:
-        logger.error(f"Job {job_id} failed: {str(e)}")
+        error_msg = str(e)
+        logger.error(f"Job {job_id} failed: {error_msg}")
         analysis_jobs[job_id]["status"] = "failed"
-        analysis_jobs[job_id]["error"] = str(e)
+        if "503" in error_msg or "demand" in error_msg.lower():
+            analysis_jobs[job_id]["error"] = "AI_MODEL_BUSY"
+        else:
+            analysis_jobs[job_id]["error"] = error_msg
     finally:
         if os.path.exists(temp_dir):
             shutil.rmtree(temp_dir)
@@ -200,17 +222,20 @@ async def analyze_repository(repo_url: str, job_id: str):
 
 
 @app.get("/")
-def read_root():
+async def read_root():
+    """Basic health check endpoint to verify API availability."""
     return {"status": "Auto-Ops Agent API is active"}
 
 @app.get("/status/{job_id}")
 async def get_status(job_id: str):
+    """Returns the current state and results of a specific analysis job."""
     if job_id not in analysis_jobs:
         raise HTTPException(status_code=404, detail="Job not found")
     return analysis_jobs[job_id]
 
 @app.post("/analyze")
 async def start_analysis(request: RepoRequest, background_tasks: BackgroundTasks):
+    """Initiates a new analysis job and returns a unique Job ID immediately."""
     job_id = str(uuid.uuid4())
     logger.info(f"Received analysis request for {request.url}. Job ID: {job_id}")
     analysis_jobs[job_id] = {"status": "pending", "result": None, "error": None}
@@ -219,6 +244,7 @@ async def start_analysis(request: RepoRequest, background_tasks: BackgroundTasks
 
 @app.post("/refetchYaml")
 async def refetch_yaml(request: YamlRequest):
+    """Regenerates only the YAML portion of an analysis if the initial attempt failed."""
     try:
         logger.info("Refetching YAML configuration based on existing analysis")
         prompt = f"""
@@ -245,6 +271,12 @@ async def refetch_yaml(request: YamlRequest):
 
 @app.post("/chat")
 async def chat_with_gemini(request: ChatRequest):
+    """
+    Handles the interactive DevOps assistant chat.
+    
+    Takes the conversation history and the current YAML configuration as context
+    to provide relevant suggestions or updates to the CI/CD pipeline.
+    """
     try:
         logger.info(f"Processing chat request. History length: {len(request.history)}")
         history = []
