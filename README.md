@@ -1,5 +1,7 @@
 Auto-Ops AI Agent 🚀
+
 [![CI/CD Pipeline](https://github.com/Juhoedvard/auto-ops-agent/actions/workflows/main.yml/badge.svg)](https://github.com/Juhoedvard/auto-ops-agent/actions/workflows/main.yml)
+
 Note: This project is under active development. Core features (analysis and generation) are functional, while UI refinement and advanced error handling are currently in progress.
 
 Live Demo: https://auto-ops-frontend-1.onrender.com/
