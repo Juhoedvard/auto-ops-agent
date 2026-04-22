@@ -1,24 +1,19 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 
 import { analysisApi } from '../api/analysisApi'; 
 import AnalysisStepper from '../components/AnalysisStepper';
 import type { AnalysisResult, JobStatus } from '../types/analysis';
-import Overview from '../components/AnalysisOverview';
-import TechStack from '../components/TechStack';
-import AccordionGroup from '../components/AccordionGroup'; 
-import YamlConfig from '../components/YamlConfig';
-import Benefits from '../components/Benefits';
-import ImplementationSteps from '../components/ImplementationSteps';
-import DetailedAnalysis from '../components/DetailedAnalysis';
+import AnalysisReport from '../components/AnalysisReport';
+import AnalysisError from '../components/AnalysisError';
 import ChatBox from '../components/ChatBox';
-import LoadingButton from '../components/LoadingButton';
 
 export default function Result() {
   const { jobId } = useParams<{ jobId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [status, setStatus] = useState<JobStatus['status']>('cloning');
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
@@ -46,6 +41,10 @@ export default function Result() {
       return;
     }
     
+    // Reset states when navigating to a new jobId (e.g. on retry)
+    setError(null);
+    setStatus('cloning');
+
     const MAX_POLL_ATTEMPTS = 120; 
     const POLL_INTERVAL = 2000;
     let active = true;
@@ -72,6 +71,13 @@ export default function Result() {
           active = false;
         } else if (data.status === 'failed') {
           setError(data.error || 'Analysis failed');
+          if (data.error === 'AI_MODEL_BUSY' && location.state?.isRetry) {
+            toast.error("Server is still busy. Please try again later.", {
+              id: 'busy-toast',
+              position: 'bottom-right',
+              duration: 5000,
+            });
+          }
           active = false;
         } else {
           setTimeout(poll, POLL_INTERVAL); 
@@ -94,7 +100,7 @@ export default function Result() {
 
     poll();
     return () => { active = false; };
-  }, [jobId, navigate]);
+  }, [jobId, navigate, location.state?.isRetry]);
 
   // Calls the backend to regenerate just the YAML if the result was incomplete
   const refetchYaml = async (e: React.MouseEvent) => {
@@ -133,13 +139,11 @@ export default function Result() {
 
     setCooldown(15);
     try {
-      toast.loading('Retrying analysis...', { id: 'retry' });
       const newJobId = await analysisApi.startAnalysis(savedUrl);
-      toast.success('Retry started!', { id: 'retry' });
-      navigate(`/result/${newJobId}`);
+      navigate(`/result/${newJobId}`, { state: { isRetry: true } });
     } catch (err: unknown) {
       console.error("Retry failed:", err);
-      toast.error('Failed to restart analysis. AI may still be busy.', { id: 'retry' });
+      toast.error('Failed to connect to server. Please try again later.');
     }
   };
 
@@ -195,58 +199,11 @@ export default function Result() {
               )}
 
               {error && (
-                <div className="h-full flex flex-col items-center justify-center text-center">
-                  <div className="text-red-400 text-4xl mb-4">⚠️</div>
-                  <h2 className="text-xl font-bold mb-2">Analysis Failed</h2>
-                  <p className="text-slate-400 mb-6">
-                    {error === 'AI_MODEL_BUSY' 
-                      ? "Gemini is currently at capacity. This is usually temporary." 
-                      : error}
-                  </p>
-                  
-                  {error === 'AI_MODEL_BUSY' ? (
-                    <button
-                      onClick={handleRetry}
-                      disabled={cooldown > 0}
-                      className={`px-8 py-3 rounded-xl font-bold transition-all ${
-                        cooldown > 0 ? 'bg-slate-700 text-slate-500 cursor-not-allowed' : 'bg-cyan-500 hover:bg-cyan-400 text-slate-900 shadow-lg shadow-cyan-500/20'
-                      }`}
-                    >
-                      {cooldown > 0 ? `Retry in ${cooldown}s` : 'Retry Analysis Now'}
-                    </button>
-                  ) : (
-                    <button onClick={() => navigate('/')} className="text-cyan-400 hover:text-cyan-300 hover:underline">Try another repository</button>
-                  )}
-                </div>
+                <AnalysisError error={error} cooldown={cooldown} onRetry={handleRetry} />
               )}
 
               {status === 'ready' && analysis && (
-                <div className="max-w-4xl mx-auto mt-4 p-6 space-y-6">
-                  <h2 className="text-2xl font-bold mb-4 text-slate-100">CI/CD Recommendation</h2>
-                  <Overview text={analysis.overview} />
-                  <TechStack techs={analysis.tech_stack} />
-                  <DetailedAnalysis content={analysis.analysis} />
-                  <AccordionGroup data={analysis} />
-                  {analysis.yaml_config ? <YamlConfig code={analysis.yaml_config} /> : (
-                      <div className="py-12 text-center flex flex-col items-center gap-4">
-                          <div className="text-slate-400 text-sm">
-                            <span className="text-amber-400/80 block mb-1 font-semibold">No YAML configuration found.</span>
-                            <p className="italic opacity-70">The analysis might have skipped this part or failed.</p>
-                          </div>
-                          
-                          <LoadingButton
-                            onClick={(e) => {refetchYaml(e)}}
-                            loading={isRefetching}
-                            loadingText="Regenerating..."
-                            className="px-6 py-2 bg-linear-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-sm font-bold rounded-lg shadow-lg shadow-cyan-500/25 active:scale-95 border border-cyan-400/20"
-                          >
-                            <span>↻</span> Refetch YAML
-                          </LoadingButton>
-                      </div>
-                  )}
-                  <Benefits benefits={analysis.benefits} />
-                  <ImplementationSteps steps={analysis.implementation_steps} />
-                </div>
+                <AnalysisReport analysis={analysis} isRefetching={isRefetching} onRefetchYaml={refetchYaml} />
               )}
             </div>
           </div>
