@@ -1,88 +1,70 @@
 Auto-Ops AI Agent 🚀
 [![CI/CD Pipeline](https://github.com/Juhoedvard/auto-ops-agent/actions/workflows/main.yml/badge.svg)](https://github.com/Juhoedvard/auto-ops-agent/actions/workflows/main.yml)
+Note: This project is under active development. Core features (analysis and generation) are functional, while UI refinement and advanced error handling are currently in progress.
 
-Tämä projekti on aktiivisessa kehitysvaiheessa. Core-ominaisuudet (analyysi ja generointi) toimivat, mutta käyttöliittymän hienosäätö ja virhekäsittely ovat vielä työn alla.
+Live Demo: https://auto-ops-frontend-1.onrender.com/
 
-Projekti on julkisena: https://auto-ops-frontend-1.onrender.com/
+Auto-Ops is an AI-powered tool designed to analyze software projects and automatically generate optimized CI/CD pipelines (GitHub Actions). Built with a modern tech stack, the project emphasizes performance, scalability, and a developer-friendly user experience.
 
-Auto-Ops on tekoälypohjainen työkalu, joka analysoi ohjelmistoprojekteja ja generoi automaattisesti niihin parhaiten sopivat CI/CD-putket (GitHub Actions). Projekti on rakennettu modernilla stackilla painottaen suorituskykyä, skaalautuvuutta ja käyttäjäystävällistä käyttöliittymää.
+🌟 Key Features
+AI-Driven Analysis: Automatically identifies project structure and technologies via LLM.
 
-🌟 Tärkeimmät ominaisuudet
+Automated YAML Generation: Creates fully functional GitHub Actions configurations.
 
-AI-analyysi: Analysoi projektin rakenteen ja teknologiat.
+Interactive UI: Modern dark-themed interface for reviewing analysis results.
 
-Automaattinen YAML-generointi: Luo täysin toimivat GitHub Actions -konfiguraatiot.
+Dockerized Environment: Streamlined setup and local development.
 
-Interaktiivinen käyttöliittymä: Moderni, tumma teema (GitHub-tyylinen) analyysin tarkasteluun.
+🛠 Tech Stack
+Frontend: React 18 (TypeScript), Vite, Tailwind CSS.
 
-Askel-askeleelta ohjeet: AI tuottaa selkeät ohjeet CI/CD-putken käyttöönottoon.
+Backend: FastAPI (Python), Google Gemini AI API, Pydantic.
 
-Docker-pohjainen kehitysympäristö: Helppo pystytys yhdellä komennolla.
+Infrastructure: Docker, Docker Compose.
 
-🛠 Teknologiat
+🚀 Getting Started
+Follow these instructions to get a copy of the project up and running on your local machine for development and testing purposes.
 
-Frontend
+Prerequisites
+Docker and Docker Compose installed on your machine.
 
-React 18 (TypeScript)
+A Google Gemini API Key (You can obtain one from the Google AI Studio).
 
-Vite (Erittäin nopea kehitysympäristö)
+Installation & Setup
+Clone the repository:
 
-Tailwind CSS (Moderni ja responsiivinen tyylittely)
-
-React Markdown & Prism (Analyysin ja koodin visualisointi)
-
-Backend
-
-FastAPI (Python) – Suorituskykyinen ja moderni API-kehys
-
-Google Gemini AI API – Kehittynyt kielimalli analyysia varten
-
-Pydantic – Datan validointi
-
-Infrastruktuuri
-
-Docker & Docker Compose – Kontitus ja ympäristön hallinta
-
-Firestore – (Valmius datan persistenssille)
-
-🚀 Aloitus
-
-Esivaatimukset
-
-Docker ja Docker Compose asennettuna.
-
-API-avain Google Gemini -palveluun.
-
-Asennus
-
-Kloonaa repo:
-
-git clone [https://github.com/kayttaja/auto-ops-agent.git](https://github.com/kayttaja/auto-ops-agent.git)
+Bash
+git clone https://github.com/juhoedvard/auto-ops-agent.git
 cd auto-ops-agent
+Configure Environment Variables:
+Create a .env file inside the backend directory:
 
+Bash
+touch backend/.env
+Add your API key to the .env file:
 
-Ympäristömuuttujat:
-Luo .env -tiedosto backend-kansioon:
+Koodinpätkä
+GEMINI_API_KEY=your_actual_api_key_here
+Launch with Docker:
+Run the following command in the root directory to build and start both the frontend and backend containers:
 
-GEMINI_API_KEY=sinun_api_avaimesi
-
-
-Käynnistä Dockerilla:
-
+Bash
 docker-compose up --build
+Access the Application:
+
+Frontend: Open http://localhost:5173 in your browser.
+
+Backend API (Swagger Docs): Open http://localhost:8000/docs.
+
+🛠 Technical Deep Dive
+The core of the Auto-Ops agent is a robust, asynchronous background task:
+
+Efficient Cloning: Uses git clone --depth 1 to minimize network overhead.
+
+Asynchronous Orchestration: Leverages Python's asyncio for non-blocking Git and AI operations.
+
+Context-Aware Heuristics: Scans for critical configuration files (e.g., package.json, requirements.txt) to provide the AI with a precise project signature.
+
+Resilient Error Handling: Includes timeouts and error states for Git failures and API limitations.
 
 
-Avaa selain:
-Frontend löytyy osoitteesta: http://localhost:5173
-Backend API: http://localhost:8000/docs
-
-
-📈 Tulevaisuuden kehityskohteet (Roadmap)
-
-[ ] Useiden eri CI/CD-alustojen tuki (GitLab CI, Azure DevOps).
-
-[ ] Suora integraatio GitHub API:n kanssa (automaattiset Pull Requestit).
-
-[ ] Analyysien tallentaminen käyttäjäkohtaisesti (Firestore-integraation viimeistely).
-
-[ ] Parempi virheenkorjauslogiikka LLM-vastauksille.
