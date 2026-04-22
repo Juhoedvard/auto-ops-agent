@@ -45,7 +45,7 @@ Bash
 touch backend/.env
 Add your API key to the .env file:
 
-Koodinpätkä
+
 GEMINI_API_KEY=your_actual_api_key_here
 Launch with Docker:
 Run the following command in the root directory to build and start both the frontend and backend containers:
