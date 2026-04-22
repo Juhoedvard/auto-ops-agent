@@ -10,8 +10,20 @@ export default function Home() {
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [isBackendWaking, setIsBackendWaking] = useState(false);
+  const [recentRepos, setRecentRepos] = useState<string[]>([]);
   const navigate = useNavigate();
   console.log(url)
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('recent_repos');
+      if (saved) {
+        setRecentRepos(JSON.parse(saved));
+      }
+    } catch (e) {
+      console.error('Failed to parse recent repos:', e);
+    }
+  }, []);
 
     useEffect(() => {
     const wakeBackend = async () => {
@@ -86,6 +98,16 @@ export default function Home() {
       // local storage on the results page to allow a manual retry.
       localStorage.setItem('pending_repo_url', url.trim());
 
+      try {
+        const prevRepos = JSON.parse(localStorage.getItem('recent_repos') || '[]');
+        const currentUrl = url.trim();
+        const newRepos = [currentUrl, ...prevRepos.filter((r: string) => r !== currentUrl)].slice(0, 3);
+        localStorage.setItem('recent_repos', JSON.stringify(newRepos));
+        setRecentRepos(newRepos);
+      } catch (e) {
+        console.error('Failed to save recent repo:', e);
+      }
+
       const jobId = await analysisApi.startAnalysis(url);
       clearTimeout(timeoutId);
       toast.success('Analysis started successfully!', { id: 'analysis' });
@@ -109,6 +131,18 @@ export default function Home() {
       } else {
         toast.error('Error starting analysis. Please check the URL and try again.', { id: 'analysis' });
       }
+    }
+  };
+
+  const handleRemoveRepo = (e: React.MouseEvent, repoToRemove: string) => {
+    e.stopPropagation(); // Prevent the parent button onClick (which sets the URL) from firing
+    try {
+      const prevRepos = JSON.parse(localStorage.getItem('recent_repos') || '[]');
+      const newRepos = prevRepos.filter((r: string) => r !== repoToRemove);
+      localStorage.setItem('recent_repos', JSON.stringify(newRepos));
+      setRecentRepos(newRepos);
+    } catch (err) {
+      console.error('Failed to remove recent repo:', err);
     }
   };
 
@@ -165,7 +199,7 @@ export default function Home() {
               </svg>
             </div>
           </div>
-                    <LoadingButton
+          <LoadingButton
             type="submit"
             loading={loading || isBackendWaking}
             loadingText={isBackendWaking ? "Waking up backend..." : "Starting..."}
@@ -175,6 +209,43 @@ export default function Home() {
           </LoadingButton>
 
         </motion.form>
+
+        {recentRepos.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.8, duration: 0.5 }}
+            className="mt-8 text-center"
+          >
+            <h3 className="text-slate-400 text-sm font-medium mb-3 uppercase tracking-wider">Recent Searches</h3>
+            <div className="flex flex-wrap justify-center gap-3">
+              {recentRepos.map((repo, idx) => (
+                <div
+                  key={idx}
+                  className="group relative flex items-center "
+                >
+                  <button
+                    type="button"
+                    onClick={() => setUrl(repo)}
+                    className="text-xs bg-slate-800/60 hover:bg-slate-700/80 border border-slate-700 hover:border-cyan-500/50 text-slate-300 py-1.5 px-4 rounded-full transition-all duration-200 shadow-sm"
+                  >
+                    {repo.replace('https://github.com/', '')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => handleRemoveRepo(e, repo)}
+                    className="opacity-0 group-hover:opacity-100 absolute -right-1.5 -top-1.5 w-5 h-5 flex items-center justify-center bg-slate-800 border border-slate-600 hover:border-red-500 hover:bg-red-500/10 text-slate-400 hover:text-red-400 rounded-full transition-all duration-200 shadow-md z-10"
+                    aria-label="Remove search"
+                  >
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
       </motion.div>
     </div>
   );

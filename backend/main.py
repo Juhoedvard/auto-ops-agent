@@ -213,6 +213,8 @@ async def analyze_repository(repo_url: str, job_id: str):
         analysis_jobs[job_id]["status"] = "failed"
         if "503" in error_msg or "demand" in error_msg.lower():
             analysis_jobs[job_id]["error"] = "AI_MODEL_BUSY"
+        elif "429" in error_msg or "quota" in error_msg.lower():
+            analysis_jobs[job_id]["error"] = "QUOTA_EXCEEDED"
         else:
             analysis_jobs[job_id]["error"] = error_msg
     finally:
