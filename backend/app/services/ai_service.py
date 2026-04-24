@@ -26,7 +26,6 @@ client = genai.Client(api_key=GOOGLE_API_KEY)
 MODEL_ID = "gemini-2.5-flash"
 
 
-
 async def generate_with_fallback(prompt: str, system_instruction: str = None, is_json: bool = False, history: list = None) -> tuple[str, bool]:
     """
     Attempts to generate content with Gemini. If it fails, falls back to Groq (llama3-70b-8192).
