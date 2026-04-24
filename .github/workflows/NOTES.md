@@ -1,0 +1,1 @@
+Tee chatboxille fallback kuten analyysille
