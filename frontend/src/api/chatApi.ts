@@ -1,5 +1,5 @@
 import axios from 'axios';
-
+import toast from 'react-hot-toast';
 
 interface ChatMessage {
   role: 'user' | 'model';
@@ -16,6 +16,7 @@ interface ChatRequest {
 
 interface ChatResponse {
   reply: string;
+  fallbackUsed?: boolean;
 }
 export interface ApiError {
   detail: string | { msg: string; type: string }[]; // FastAPI:n standardi
@@ -37,6 +38,10 @@ export const chatApi = {
     try {
       const response = await api.post<ChatResponse>('/chat', request);
       
+      if (response.data.fallbackUsed) {
+         toast('Gemini is busy. Switched to Groq Llama-70B model.', { icon: '🔄', id: 'fallback-chat', duration: 4000 });
+      }
+
       // Varmistetaan, että vastaus sisältää odotetun tekstin
       if (!response.data || typeof response.data.reply !== 'string') {
         throw new Error('Server returned an invalid response.');

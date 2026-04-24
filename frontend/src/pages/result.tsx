@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -21,6 +21,7 @@ export default function Result() {
   const [isRefetching, setIsRefetching] = useState(false);
   const [activeSection, setActiveSection] = useState<'main' | 'chat'>('main');
   const [cooldown, setCooldown] = useState(0);
+  const fallbackToastShown = useRef(false);
 
   // Visual timer for the 'Retry' button when Gemini is at capacity
   useEffect(() => {
@@ -64,6 +65,11 @@ export default function Result() {
         pollCount++;
         consecutiveErrors = 0; 
         setStatus(data.status);
+
+        if (data.fallbackUsed && !fallbackToastShown.current) {
+          toast('Gemini is busy. Switched to Groq Llama-70B model.', { icon: '🔄', id: 'fallback-status', duration: 5000 });
+          fallbackToastShown.current = true;
+        }
 
         if (data.status === 'ready' && data.result) {
           setAnalysis(data.result);
@@ -115,6 +121,9 @@ export default function Result() {
         jobId: jobId as string
       });
 
+      if (result.fallbackUsed) {
+        toast('Gemini is busy. Switched to Groq Llama-70B model.', { icon: '🔄', id: 'fallback-yaml', duration: 4000 });
+      }
 
       setAnalysis({
         ...analysis,

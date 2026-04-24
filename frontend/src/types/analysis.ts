@@ -8,9 +8,10 @@ export interface AnalysisResult {
 }
 
 
-export  interface JobStatus {
+export interface JobStatus {
   id: string;
   status: 'pending' | 'cloning' | 'analyzing' | 'generating' | 'ready' | 'failed';
   result?: AnalysisResult;
   error?: string;
+  fallbackUsed?: boolean;
 }
