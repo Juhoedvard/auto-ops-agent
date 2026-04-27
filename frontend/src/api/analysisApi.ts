@@ -1,8 +1,9 @@
 
 import axios from 'axios';
-import type { AnalysisResult, JobStatus } from '../types/analysis';
+import type { AnalysisData, AnalysisResult, JobStatus } from '../types/analysis';
 
-type AnalysisContext =  Pick<AnalysisResult, 'overview' | 'analysis'> & { jobId: string };
+type AnalysisContext =  Pick<AnalysisResult, 'overview' | 'analysis'> & { jobId: string, ai: 'gemini' | 'groq' };
+
 
 const BASE_URL  = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 const api = axios.create({
@@ -67,9 +68,9 @@ const circuitBreaker = new CircuitBreaker();
 
 export const analysisApi = {
 
-  startAnalysis: async (repoUrl: string): Promise<string> => {
+  startAnalysis: async (analysisData: AnalysisData): Promise<string> => {
     return circuitBreaker.execute(async () => {
-      const response = await api.post<{ jobId: string }>('/analyze', { url: repoUrl });
+      const response = await api.post<{ jobId: string }>('/analyze', analysisData);
       return response.data.jobId;
     });
   },
@@ -97,4 +98,3 @@ export const analysisApi = {
     }
   }
 };
-

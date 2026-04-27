@@ -2,7 +2,7 @@ import uuid
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from app.models.schemas import RepoRequest, ChatRequest, YamlRequest
 from app.services.repo_service import analyze_repository
-from app.services.ai_service import generate_with_fallback, sanitize_analysis_result
+from app.services.ai_service import generate_with_gemini, generate_with_groq, sanitize_analysis_result
 import json
 import logging
 
@@ -23,7 +23,7 @@ async def start_analysis(request: RepoRequest, background_tasks: BackgroundTasks
     
     analysis_jobs[job_id] = {"status": "pending", "result": None, "error": None}
 
-    background_tasks.add_task(analyze_repository, request.url.strip(), job_id, analysis_jobs)
+    background_tasks.add_task(analyze_repository, request.url.strip(), job_id, analysis_jobs, getattr(request, "ai", "gemini"))
     
     return {"jobId": job_id}
 
@@ -48,23 +48,51 @@ async def chat_with_ai(request: ChatRequest):
             "You are Auto-Ops AI, a professional Senior DevOps Assistant. "
             f"CURRENT PROJECT YAML:\n{request.context}\n"
         )
-        
-        text, fallback_used = await generate_with_fallback(
-            request.message, 
-            system_instruction=system_instruction, 
-            history=history
-        )
-        
-        return {"reply": text, "fallbackUsed": fallback_used}
+
+        ai = getattr(request, "ai", "gemini")
+        if ai == "groq":
+            text = await generate_with_groq(
+                request.message,
+                system_instruction=system_instruction,
+                history=history
+            )
+            return {"reply": text, "aiUsed": "groq"}
+        else:
+            # Use Gemini strictly
+            text = await generate_with_gemini(
+                request.message,
+                system_instruction=system_instruction,
+                history=history
+            )
+            return {"reply": text, "aiUsed": "gemini"}
     except Exception as e:
         logger.error(f"Error in chat: {str(e)}")
+        error_msg = str(e).lower()
+        if "503" in error_msg or "demand" in error_msg or "429" in error_msg or "quota" in error_msg:
+            raise HTTPException(status_code=503, detail="AI_MODEL_BUSY")
+        if "400" in error_msg or "api key" in error_msg:
+            raise HTTPException(status_code=400, detail="API_KEY_INVALID")
         raise HTTPException(status_code=500, detail="Chat failed")
 
 @router.post("/refetchYaml")
 async def refetch_yaml(request: YamlRequest):
-
-    prompt = f"Generate YAML based on: {request.overview}\n{request.analysis}"
-    text, fallback_used = await generate_with_fallback(prompt, is_json=True)
-    res = json.loads(text)
-    res["fallbackUsed"] = fallback_used
-    return res
+    try:
+        prompt = f"Generate YAML based on: {request.overview}\n{request.analysis}"
+        ai = getattr(request, "ai", "gemini")
+        
+        if ai == "groq":
+            text = await generate_with_groq(prompt, is_json=True)
+        else:
+            text = await generate_with_gemini(prompt, is_json=True)
+            
+        res = json.loads(text)
+        res["aiUsed"] = ai
+        return res
+    except Exception as e:
+        logger.error(f"Error refetching yaml: {str(e)}")
+        error_msg = str(e).lower()
+        if "503" in error_msg or "demand" in error_msg or "429" in error_msg or "quota" in error_msg:
+            raise HTTPException(status_code=503, detail="AI_MODEL_BUSY")
+        if "400" in error_msg or "api key" in error_msg:
+            raise HTTPException(status_code=400, detail="API_KEY_INVALID")
+        raise HTTPException(status_code=500, detail="Refetch failed")

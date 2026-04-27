@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import toast from 'react-hot-toast';
+import Modal from 'react-modal';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { chatApi } from '../api/chatApi';
@@ -21,10 +22,25 @@ interface ChatBoxProps {
   isActive?: boolean;
 }
 
+interface ApiErrorResponse {
+  response?: {
+    data?: {
+      detail?: string;
+    };
+  };
+}
+
+const AI_OPTIONS = [
+  { value: 'gemini', label: 'Gemini' },
+  { value: 'groq', label: 'Groq/Llama' },
+];
+
 export default function ChatBox({ contextYaml, status, onChatActivity, onMessagesChange, isActive = false }: ChatBoxProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedAI, setSelectedAI] = useState<'gemini' | 'groq'>('gemini');
+  const [showSwitchModal, setShowSwitchModal] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
 
@@ -59,15 +75,25 @@ export default function ChatBox({ contextYaml, status, onChatActivity, onMessage
         history: messages.map(m => ({
           role: (m.role === 'assistant' ? 'model' : 'user') as 'user' | 'model',
           parts: [{ text: m.content }]
-        })).slice(-10)
+        })).slice(-10),
+        ai: selectedAI,
       });
 
 
       setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
 
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
-      toast.error(errorMessage);
+      let errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
+      if (err && typeof err === 'object' && 'response' in err) {
+        errorMessage = (err as ApiErrorResponse).response?.data?.detail || errorMessage;
+      }
+
+      if (errorMessage === 'AI_MODEL_BUSY' || errorMessage === 'API_KEY_INVALID' || errorMessage.includes('503') || errorMessage.includes('400')) {
+        setShowSwitchModal(true);
+      } else {
+        const alternativeAi = selectedAI === 'gemini' ? 'Groq' : 'Gemini';
+        toast.error(`${errorMessage}. Consider switching to ${alternativeAi}.`, { duration: 5000 });
+      }
       // Mark the last assistant message as failed
       setMessages(prev => {
         const newMessages = [...prev];
@@ -85,9 +111,11 @@ export default function ChatBox({ contextYaml, status, onChatActivity, onMessage
     }
   };
 
-  const retryMessage = async (messageIndex: number) => {
+  const retryMessage = async (messageIndex: number, overrideAi?: 'gemini' | 'groq') => {
     const messageToRetry = messages[messageIndex - 1]; // Get the user message before this assistant message
     if (!messageToRetry || messageToRetry.role !== 'user') return;
+
+    const aiToUse = overrideAi || selectedAI;
 
     // Mark as retrying
     setMessages(prev => prev.map((msg, idx) => 
@@ -101,15 +129,25 @@ export default function ChatBox({ contextYaml, status, onChatActivity, onMessage
         history: messages.slice(0, messageIndex).map(m => ({
           role: (m.role === 'assistant' ? 'model' : 'user') as 'user' | 'model',
           parts: [{ text: m.content }]
-        })).slice(-10)
+        })).slice(-10),
+        ai: aiToUse,
       });
 
       setMessages(prev => prev.map((msg, idx) => 
         idx === messageIndex ? { role: 'assistant', content: reply, failed: false, retrying: false } : msg
       ));
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Retry failed. Please try again.';
-      toast.error(errorMessage);
+      let errorMessage = err instanceof Error ? err.message : 'Retry failed. Please try again.';
+      if (err && typeof err === 'object' && 'response' in err) {
+        errorMessage = (err as ApiErrorResponse).response?.data?.detail || errorMessage;
+      }
+
+      if (errorMessage === 'AI_MODEL_BUSY' || errorMessage === 'API_KEY_INVALID' || errorMessage.includes('503') || errorMessage.includes('400')) {
+        setShowSwitchModal(true);
+      } else {
+        const alternativeAi = selectedAI === 'gemini' ? 'Groq' : 'Gemini';
+        toast.error(`${errorMessage}. Consider switching to ${alternativeAi}.`, { duration: 5000 });
+      }
       setMessages(prev => prev.map((msg, idx) => 
         idx === messageIndex ? { ...msg, failed: true, retrying: false } : msg
       ));
@@ -127,7 +165,24 @@ export default function ChatBox({ contextYaml, status, onChatActivity, onMessage
       }`}
     >
       <div className="p-3 sm:p-4 border-b border-slate-700/50 flex justify-between items-center bg-slate-800/80 backdrop-blur-sm rounded-t-xl">
-        <h2 className="font-semibold text-xs uppercase tracking-widest text-slate-400">AI Assistant</h2>
+        <div className="flex flex-col gap-1">
+          <h2 className="font-semibold text-xs uppercase tracking-widest text-slate-400">AI Assistant</h2>
+          <div className="flex gap-2 mt-1">
+            {AI_OPTIONS.map(opt => (
+              <label key={opt.value} className={`flex items-center gap-1 text-xs px-2 py-1 rounded cursor-pointer transition-all ${selectedAI === opt.value ? 'bg-cyan-900/60 text-cyan-300 border border-cyan-400/40' : 'bg-slate-700/40 text-slate-400 border border-slate-600/30'}`}>
+                <input
+                  type="radio"
+                  name="ai-select"
+                  value={opt.value}
+                  checked={selectedAI === opt.value}
+                  onChange={() => setSelectedAI(opt.value as 'gemini' | 'groq')}
+                  className="accent-cyan-400"
+                />
+                {opt.label}
+              </label>
+            ))}
+          </div>
+        </div>
         <span className="flex items-center gap-2 text-[10px] font-mono">
           <span className={`${status === 'ready' ? 'text-emerald-400' : 'text-amber-400'}`}>
             {status === 'ready' ? 'ONLINE' : 'WAITING'}
@@ -275,6 +330,48 @@ export default function ChatBox({ contextYaml, status, onChatActivity, onMessage
           </LoadingButton>
         </form>
       </div>
+
+      <Modal
+        isOpen={showSwitchModal}
+        onRequestClose={() => setShowSwitchModal(false)}
+        className="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-sm mx-auto mt-40 outline-none shadow-2xl"
+        overlayClassName="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-start justify-center"
+      >
+        <h3 className="text-xl font-bold text-slate-200 mb-2">AI Unavailable</h3>
+        <p className="text-slate-400 text-sm mb-6">
+          The selected AI ({selectedAI === 'gemini' ? 'Gemini' : 'Groq'}) is currently unavailable (Busy or Invalid API Key). Would you like to switch to {selectedAI === 'gemini' ? 'Groq' : 'Gemini'} and try again?
+        </p>
+        <div className="flex justify-end gap-3">
+          <button
+            onClick={() => setShowSwitchModal(false)}
+            className="px-4 py-2 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-700 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => {
+              const targetAi = selectedAI === 'gemini' ? 'groq' : 'gemini';
+              setSelectedAI(targetAi);
+              setShowSwitchModal(false);
+              
+              // Find the index of the most recent failed message and retry it
+              let lastFailedIndex = -1;
+              for (let i = messages.length - 1; i >= 0; i--) {
+                if (messages[i].failed) {
+                  lastFailedIndex = i;
+                  break;
+                }
+              }
+              if (lastFailedIndex !== -1) {
+                retryMessage(lastFailedIndex, targetAi);
+              }
+            }}
+            className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-900 rounded-lg text-sm font-bold shadow-lg shadow-cyan-500/20 transition-all"
+          >
+            Switch to {selectedAI === 'gemini' ? 'Groq' : 'Gemini'} & Retry
+          </button>
+        </div>
+      </Modal>
     </motion.div>
   );
 }

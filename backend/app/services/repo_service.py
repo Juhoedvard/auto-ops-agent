@@ -12,7 +12,7 @@ import tempfile
 
 from pathlib import Path
 
-from app.services.ai_service import generate_with_fallback, sanitize_analysis_result
+from app.services.ai_service import generate_with_gemini, generate_with_groq, sanitize_analysis_result
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +50,7 @@ async def get_repo_content(temp_dir: str):
     return content_summary
 
 
-async def analyze_repository(repo_url: str, job_id: str, analysis_jobs: dict):
+async def analyze_repository(repo_url: str, job_id: str, analysis_jobs: dict, ai: str = "gemini"):
     """
     The core background task for repository analysis.
     
@@ -93,28 +93,32 @@ async def analyze_repository(repo_url: str, job_id: str, analysis_jobs: dict):
             "Language: English. Ensure the JSON is valid and the YAML is properly escaped."
         )
         
-      
-        text, fallback_used = await generate_with_fallback(prompt, is_json=True)
+        analysis_jobs[job_id]["aiUsed"] = ai
+        
+        if ai == "groq":
+            text = await generate_with_groq(prompt, is_json=True)
+        else:
+            text = await generate_with_gemini(prompt, is_json=True)
         
         raw_json = json.loads(text)
 
         analysis_jobs[job_id]["result"] = sanitize_analysis_result(raw_json)
         analysis_jobs[job_id]["status"] = "ready"
-        analysis_jobs[job_id]["fallbackUsed"] = fallback_used
         logger.info(f"Analysis complete for job {job_id}")
         
     except Exception as e:
         error_msg = str(e)
         logger.error(f"Job {job_id} failed: {error_msg}")
         analysis_jobs[job_id]["status"] = "failed"
-        if "503" in error_msg or "demand" in error_msg.lower():
+        error_msg_lower = error_msg.lower()
+        if "503" in error_msg_lower or "demand" in error_msg_lower:
             analysis_jobs[job_id]["error"] = "AI_MODEL_BUSY"
-        elif "429" in error_msg or "quota" in error_msg.lower():
+        elif "429" in error_msg_lower or "quota" in error_msg_lower:
             analysis_jobs[job_id]["error"] = "QUOTA_EXCEEDED"
+        elif "400" in error_msg_lower or "api key" in error_msg_lower:
+            analysis_jobs[job_id]["error"] = "API_KEY_INVALID"
         else:
             analysis_jobs[job_id]["error"] = error_msg
     finally:
         if os.path.exists(temp_dir):
             shutil.rmtree(temp_dir)
-
-

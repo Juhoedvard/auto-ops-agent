@@ -13,5 +13,9 @@ export interface JobStatus {
   status: 'pending' | 'cloning' | 'analyzing' | 'generating' | 'ready' | 'failed';
   result?: AnalysisResult;
   error?: string;
-  fallbackUsed?: boolean;
+  aiUsed?: 'gemini' | 'groq';
+}
+export interface AnalysisData {
+  url: string;
+  ai: 'gemini' | 'groq';
 }

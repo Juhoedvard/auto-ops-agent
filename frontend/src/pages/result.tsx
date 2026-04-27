@@ -19,6 +19,7 @@ export default function Result() {
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isRefetching, setIsRefetching] = useState(false);
+  const [aiUsed, setAiUsed] = useState<'gemini' | 'groq'>('gemini');
   const [activeSection, setActiveSection] = useState<'main' | 'chat'>('main');
   const [cooldown, setCooldown] = useState(0);
   const fallbackToastShown = useRef(false);
@@ -66,9 +67,13 @@ export default function Result() {
         consecutiveErrors = 0; 
         setStatus(data.status);
 
-        if (data.fallbackUsed && !fallbackToastShown.current) {
-          toast('Gemini is busy. Switched to Groq Llama-70B model.', { icon: '🔄', id: 'fallback-status', duration: 5000 });
+        if (data.aiUsed === 'groq' && !fallbackToastShown.current) {
+          toast('Using Groq Llama-70B model.', { icon: '🔄', id: 'fallback-status', duration: 5000 });
           fallbackToastShown.current = true;
+        }
+        
+        if (data.aiUsed) {
+          setAiUsed(data.aiUsed);
         }
 
         if (data.status === 'ready' && data.result) {
@@ -118,11 +123,12 @@ export default function Result() {
       const result = await analysisApi.handleRegenerateYaml({
         analysis: analysis.analysis,
         overview: analysis.overview,
-        jobId: jobId as string
+        jobId: jobId as string,
+        ai: aiUsed
       });
 
-      if (result.fallbackUsed) {
-        toast('Gemini is busy. Switched to Groq Llama-70B model.', { icon: '🔄', id: 'fallback-yaml', duration: 4000 });
+      if (result.aiUsed === 'groq') {
+        toast('Using Groq Llama-70B model.', { icon: '🔄', id: 'fallback-yaml', duration: 4000 });
       }
 
       setAnalysis({
@@ -148,7 +154,26 @@ export default function Result() {
 
     setCooldown(15);
     try {
-      const newJobId = await analysisApi.startAnalysis(savedUrl);
+      const newJobId = await analysisApi.startAnalysis({ url: savedUrl, ai: aiUsed });
+      navigate(`/result/${newJobId}`, { state: { isRetry: true } });
+    } catch (err: unknown) {
+      console.error("Retry failed:", err);
+      toast.error('Failed to connect to server. Please try again later.');
+    }
+  };
+
+  // Triggered when the user decides to switch the AI and immediately retry
+  const handleSwitchAndRetry = async () => {
+    const savedUrl = localStorage.getItem('pending_repo_url');
+    if (!savedUrl) {
+      toast.error("No repository URL found to retry.");
+      return;
+    }
+
+    const targetAi = aiUsed === 'gemini' ? 'groq' : 'gemini';
+    setCooldown(15);
+    try {
+      const newJobId = await analysisApi.startAnalysis({ url: savedUrl, ai: targetAi });
       navigate(`/result/${newJobId}`, { state: { isRetry: true } });
     } catch (err: unknown) {
       console.error("Retry failed:", err);
@@ -208,7 +233,7 @@ export default function Result() {
               )}
 
               {error && (
-                <AnalysisError error={error} cooldown={cooldown} onRetry={handleRetry} />
+                <AnalysisError error={error} cooldown={cooldown} aiUsed={aiUsed} onRetry={handleRetry} onSwitchAndRetry={handleSwitchAndRetry} />
               )}
 
               {status === 'ready' && analysis && (

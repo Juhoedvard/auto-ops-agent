@@ -11,8 +11,14 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [isBackendWaking, setIsBackendWaking] = useState(false);
   const [recentRepos, setRecentRepos] = useState<string[]>([]);
+  const [selectedAI, setSelectedAI] = useState<'gemini' | 'groq'>('gemini');
   const navigate = useNavigate();
   console.log(url)
+
+  const AI_OPTIONS = [
+    { value: 'gemini', label: 'Gemini' },
+    { value: 'groq', label: 'Groq/Llama' },
+  ];
 
   useEffect(() => {
     try {
@@ -29,8 +35,7 @@ export default function Home() {
     const wakeBackend = async () => {
       let wakeToastId: string | undefined;
       
-      // Only show the toast if the backend takes more than 1.5s to respond
-      // (This avoids annoying users if the backend is already awake)
+
       const toastTimer = setTimeout(() => {
         wakeToastId = toast.loading('Waking up backend services...', { 
           id: 'wake-up',
@@ -108,7 +113,7 @@ export default function Home() {
         console.error('Failed to save recent repo:', e);
       }
 
-      const jobId = await analysisApi.startAnalysis(url);
+      const jobId = await analysisApi.startAnalysis({ url: url.trim(), ai: selectedAI });
       clearTimeout(timeoutId);
       toast.success('Analysis started successfully!', { id: 'analysis' });
       navigate(`/result/${jobId}`);
@@ -184,6 +189,22 @@ export default function Home() {
           transition={{ delay: 0.6, duration: 0.5 }}
           className="mt-6 sm:mt-8 space-y-4 sm:space-y-6"
         >
+          <div className="flex justify-center gap-3">
+            {AI_OPTIONS.map(opt => (
+              <label key={opt.value} className={`flex items-center gap-2 text-sm px-3 py-2 rounded-lg cursor-pointer transition-all ${selectedAI === opt.value ? 'bg-cyan-900/60 text-cyan-300 border border-cyan-400/40' : 'bg-slate-700/40 text-slate-400 border border-slate-600/30'}`}>
+                <input
+                  type="radio"
+                  name="ai-select"
+                  value={opt.value}
+                  checked={selectedAI === opt.value}
+                  onChange={() => setSelectedAI(opt.value as 'gemini' | 'groq')}
+                  className="w-4 h-4 accent-cyan-400"
+                />
+                {opt.label}
+              </label>
+            ))}
+          </div>
+
           <div className="relative">
             <input
               type="text"
