@@ -11,6 +11,7 @@ interface ChatRequest {
   message: string;
   context: string;
   history: ChatMessage[];
+  ai?: 'gemini' | 'groq';
 }
 
 

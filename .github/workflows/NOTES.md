@@ -1,1 +1,1 @@
-Tee chatboxille fallback kuten analyysille
+Muokkaa ai mallin vaihtoa, ettei näytä toast koko ajan, vaan näkyy jossakin konkreettisesti.
