@@ -45,12 +45,13 @@ async def get_repo_content(temp_dir: str):
             try:
                 with open(file_path, "r", encoding="utf-8") as f:
                     content_summary += f"\n--- FILE: {file_name} ---\n{f.read(2000)}\n"
-            except: continue
+            except Exception:
+                continue
 
     return content_summary
 
 
-async def analyze_repository(repo_url: str, job_id: str, analysis_jobs: dict, ai: str = "gemini"):
+async def analyze_repository(repo_url: str, job_id: str, analysis_jobs: dict, ai: str = "gemini", progress_callback=None):
     """
     The core background task for repository analysis.
     
@@ -64,17 +65,35 @@ async def analyze_repository(repo_url: str, job_id: str, analysis_jobs: dict, ai
     temp_dir = tempfile.mkdtemp()
 
     logger.info(f"Starting analysis for job {job_id}: {repo_url}")
-    try: 
+    try:
         analysis_jobs[job_id]["status"] = "cloning"
-    
+        if progress_callback:
+            await progress_callback({
+                "id": job_id,
+                "status": "cloning",
+                "message": "Cloning repository..."
+            })
+
         await clone_repository(repo_url, temp_dir)
-        
+
         analysis_jobs[job_id]["status"] = "analyzing"
-        
+        if progress_callback:
+            await progress_callback({
+                "id": job_id,
+                "status": "analyzing",
+                "message": "Analyzing repository structure..."
+            })
+
         content_summary = await get_repo_content(temp_dir)
 
         analysis_jobs[job_id]["status"] = "generating"
-        
+        if progress_callback:
+            await progress_callback({
+                "id": job_id,
+                "status": "generating",
+                "message": "Generating YAML and analysis..."
+            })
+
         prompt = (
             f"Act as a Senior DevOps Engineer. Your task is to analyze the provided repository: {repo_url}\n"
             f"Use the following file context to determine the build, test, and deployment requirements:\n"
@@ -92,20 +111,27 @@ async def analyze_repository(repo_url: str, job_id: str, analysis_jobs: dict, ai
             "6. 'benefits': A list of how this specific pipeline improves the development lifecycle.\n\n"
             "Language: English. Ensure the JSON is valid and the YAML is properly escaped."
         )
-        
+
         analysis_jobs[job_id]["aiUsed"] = ai
-        
+
         if ai == "groq":
             text = await generate_with_groq(prompt, is_json=True)
         else:
             text = await generate_with_gemini(prompt, is_json=True)
-        
+
         raw_json = json.loads(text)
 
         analysis_jobs[job_id]["result"] = sanitize_analysis_result(raw_json)
         analysis_jobs[job_id]["status"] = "ready"
         logger.info(f"Analysis complete for job {job_id}")
-        
+
+        if progress_callback:
+            await progress_callback({
+                "id": job_id,
+                "status": "ready",
+                "result": analysis_jobs[job_id]["result"],
+                "aiUsed": ai,
+            })
     except Exception as e:
         error_msg = str(e)
         logger.error(f"Job {job_id} failed: {error_msg}")
@@ -119,6 +145,13 @@ async def analyze_repository(repo_url: str, job_id: str, analysis_jobs: dict, ai
             analysis_jobs[job_id]["error"] = "API_KEY_INVALID"
         else:
             analysis_jobs[job_id]["error"] = error_msg
+
+        if progress_callback:
+            await progress_callback({
+                "id": job_id,
+                "status": "failed",
+                "error": analysis_jobs[job_id]["error"],
+            })
     finally:
         if os.path.exists(temp_dir):
             shutil.rmtree(temp_dir)

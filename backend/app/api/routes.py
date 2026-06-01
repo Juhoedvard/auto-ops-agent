@@ -1,8 +1,11 @@
 import uuid
 from fastapi import APIRouter, HTTPException, BackgroundTasks
+from typing import Dict
 from app.models.schemas import RepoRequest, ChatRequest, YamlRequest
 from app.services.repo_service import analyze_repository
-from app.services.ai_service import generate_with_gemini, generate_with_groq, sanitize_analysis_result
+from app.services.ai_service import generate_with_gemini, generate_with_groq
+from app.api.state import analysis_jobs
+from app.api.ws import broadcast_to_job
 import json
 import logging
 
@@ -10,20 +13,70 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-analysis_jobs = {}
-
 @router.get("/")
 async def read_root():
     return {"status": "Auto-Ops Agent API is active"}
+
+async def background_task_with_websocket_update(
+    url: str,
+    job_id: str,
+    jobs_dict: Dict[str, dict],
+    ai: str,
+):
+    """Background task with WebSocket broadcasting support"""
+
+    status_updates = {
+        "id": job_id,
+        "status": "cloning",
+        "message": "Cloning repository..."
+    }
+
+    jobs_dict[job_id]["status"] = "cloning"
+    await broadcast_to_job(job_id, status_updates)
+
+    async def send_job_update(message: dict):
+        await broadcast_to_job(job_id, message)
+
+    try:
+        await analyze_repository(
+            url,
+            job_id,
+            jobs_dict,
+            ai,
+            progress_callback=send_job_update,
+        )
+    except Exception as e:
+        error_msg = str(e)
+        jobs_dict[job_id]["status"] = "failed"
+        jobs_dict[job_id]["error"] = error_msg
+        logger.error(f"Unexpected analysis error for job {job_id}: {error_msg}")
+        await broadcast_to_job(job_id, {
+            "id": job_id,
+            "status": "failed",
+            "error": error_msg,
+        })
+        return
+
+    await broadcast_to_job(job_id, {"id": job_id, **jobs_dict[job_id]})
 
 @router.post("/analyze")
 async def start_analysis(request: RepoRequest, background_tasks: BackgroundTasks):
     job_id = str(uuid.uuid4())
     logger.info(f"Received analysis request for {request.url}. Job ID: {job_id}")
     
-    analysis_jobs[job_id] = {"status": "pending", "result": None, "error": None}
-
-    background_tasks.add_task(analyze_repository, request.url.strip(), job_id, analysis_jobs, getattr(request, "ai", "gemini"))
+    # Get AI parameter (default to gemini)
+    ai = getattr(request, "ai", "gemini")
+    analysis_jobs[job_id] = {
+        "status": "pending",
+        "result": None,
+        "error": None,
+        "aiUsed": ai,
+    }
+    
+    background_tasks.add_task(
+        background_task_with_websocket_update,
+        request.url.strip(), job_id, analysis_jobs, ai
+    )
     
     return {"jobId": job_id}
 
@@ -96,3 +149,4 @@ async def refetch_yaml(request: YamlRequest):
         if "400" in error_msg or "api key" in error_msg:
             raise HTTPException(status_code=400, detail="API_KEY_INVALID")
         raise HTTPException(status_code=500, detail="Refetch failed")
+
