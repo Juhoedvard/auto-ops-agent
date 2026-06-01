@@ -101,7 +101,7 @@ def sanitize_analysis_result(raw_data: Any) -> dict:
             try:
                 parsed = json.loads(val.replace("'", '"'))
                 clean_data[field] = parsed if isinstance(parsed, list) else [val]
-            except:
+            except (json.JSONDecodeError, TypeError, ValueError):
                 clean_data[field] = [val]
         elif isinstance(val, list):
             clean_data[field] = val

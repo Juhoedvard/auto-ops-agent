@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -22,7 +22,10 @@ export default function Result() {
   const [aiUsed, setAiUsed] = useState<'gemini' | 'groq'>('gemini');
   const [activeSection, setActiveSection] = useState<'main' | 'chat'>('main');
   const [cooldown, setCooldown] = useState(0);
+  const [fallbackPolling, setFallbackPolling] = useState(false);
   const fallbackToastShown = useRef(false);
+  const socketRef = useRef<WebSocket | null>(null);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Visual timer for the 'Retry' button when Gemini is at capacity
   useEffect(() => {
@@ -32,86 +35,112 @@ export default function Result() {
     }
   }, [cooldown]);
 
-  /**
-   * Polling Logic:
-   * Continually checks the backend status endpoint until the job is 'ready' or 'failed'.
-   * Includes basic exponential backoff for network-level consecutive errors.
-   */
   useEffect(() => {
     if (!jobId) {
-      navigate('/'); 
+      navigate('/');
       return;
     }
-    
-    // Reset states when navigating to a new jobId (e.g. on retry)
+
     setError(null);
     setStatus('cloning');
+    setFallbackPolling(false);
+    fallbackToastShown.current = false;
 
-    const MAX_POLL_ATTEMPTS = 120; 
-    const POLL_INTERVAL = 2000;
-    let active = true;
-    let pollCount = 0;
-    let consecutiveErrors = 0;
-    
-    const poll = async () => {
-      if (!active || pollCount >= MAX_POLL_ATTEMPTS) {
-        if (pollCount >= MAX_POLL_ATTEMPTS) {
-          setError("Analysis is taking longer than expected. Please refresh the page or contact support if the issue persists.");
-        }
-        return;
-      }
-      
-      try {
-        const data = await analysisApi.checkStatus(jobId);
-        pollCount++;
-        consecutiveErrors = 0; 
-        setStatus(data.status);
-
-        if (data.aiUsed === 'groq' && !fallbackToastShown.current) {
-          toast('Using Groq Llama-70B model.', { icon: '🔄', id: 'fallback-status', duration: 5000 });
-          fallbackToastShown.current = true;
-        }
-        
-        if (data.aiUsed) {
-          setAiUsed(data.aiUsed);
+    const connection = analysisApi.subscribeJobStatus(jobId, {
+      onOpen: () => {
+        console.log(`WebSocket connected for job ${jobId}`);
+        setFallbackPolling(false);
+      },
+      onMessage: (data) => {
+        if (!data || typeof data !== 'object') {
+          return;
         }
 
-        if (data.status === 'ready' && data.result) {
-          setAnalysis(data.result);
-          console.log(data)
-          active = false;
-        } else if (data.status === 'failed') {
-          setError(data.error || 'Analysis failed');
-          if (data.error === 'AI_MODEL_BUSY' && location.state?.isRetry) {
-            toast.error("Server is still busy. Please try again later.", {
-              id: 'busy-toast',
-              position: 'bottom-right',
-              duration: 5000,
-            });
+        const payload = data as Partial<JobStatus> & { type?: string };
+
+        if (payload.type === 'status' || payload.status) {
+          const currentStatus = payload.status as JobStatus['status'];
+          setStatus(currentStatus);
+          if (payload.aiUsed) {
+            setAiUsed(payload.aiUsed as 'gemini' | 'groq');
           }
-          active = false;
-        } else {
-          setTimeout(poll, POLL_INTERVAL); 
+
+          if (currentStatus === 'ready' && payload.result) {
+            setAnalysis(payload.result as AnalysisResult);
+          }
+
+          if (currentStatus === 'failed') {
+            setError((payload.error as string) || 'Analysis failed');
+            if ((payload.error as string) === 'AI_MODEL_BUSY' && location.state?.isRetry) {
+              toast.error('Server is still busy. Please try again later.', {
+                id: 'busy-toast',
+                position: 'bottom-right',
+                duration: 5000,
+              });
+            }
+          }
         }
-      } catch (err: unknown) {
-        pollCount++;
-        consecutiveErrors++;
-        
-        
-        if (consecutiveErrors < 3) {
-          console.warn(`Polling attempt ${pollCount} failed, retrying... (${consecutiveErrors}/3)`, err);
-          setTimeout(poll, POLL_INTERVAL);
-        } else {
-          console.error("Polling failed permanently after consecutive errors:", err);
-          setError("Unable to connect to server. Please check your internet connection and try again.");
-          active = false;
+      },
+      onError: (error) => {
+        console.error('WebSocket error:', error);
+        setFallbackPolling(true);
+        if (!socketRef.current) {
+          setError('Real-time connection failed. Falling back to status polling.');
         }
+      },
+      onClose: () => {
+        console.log(`WebSocket closed for job ${jobId}`);
+        setFallbackPolling(true);
+      },
+    });
+
+    socketRef.current = connection.socket;
+
+    return () => {
+      connection.close();
+      socketRef.current = null;
+    };
+  }, [jobId, navigate, location.state?.isRetry]);
+
+  const refreshJobStatus = useCallback(async () => {
+    if (!jobId || status === 'ready' || status === 'failed') {
+      return;
+    }
+
+    try {
+      const data = await analysisApi.checkStatus(jobId);
+      setStatus(data.status);
+      if (data.aiUsed) {
+        setAiUsed(data.aiUsed);
+      }
+
+      if (data.status === 'ready' && data.result) {
+        setAnalysis(data.result);
+      }
+
+      if (data.status === 'failed') {
+        setError(data.error || 'Analysis failed');
+      }
+    } catch (err) {
+      console.error('Fallback polling failed:', err);
+    }
+  }, [jobId, status]);
+
+  useEffect(() => {
+    if (!fallbackPolling || !jobId || status === 'ready' || status === 'failed') {
+      return;
+    }
+
+    refreshJobStatus();
+    pollingRef.current = setInterval(refreshJobStatus, 5000);
+
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
       }
     };
-
-    poll();
-    return () => { active = false; };
-  }, [jobId, navigate, location.state?.isRetry]);
+  }, [fallbackPolling, refreshJobStatus]);
 
   // Calls the backend to regenerate just the YAML if the result was incomplete
   const refetchYaml = async (e: React.MouseEvent) => {
